@@ -7,13 +7,21 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--ping=true"
     ports:
       - "127.0.0.1:80:80"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    healthcheck:
+      test: [ "CMD", "traefik", "healthcheck", "--ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - teamcity-monitor-backend
-      - teamcity-monitor-web
+      teamcity-monitor-backend:
+        condition: service_healthy
+      teamcity-monitor-web:
+        condition: service_healthy
 
   teamcity-monitor-backend:
     build: backend
@@ -42,3 +50,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.tcm-web.rule=Host(`teamcity-monitor.lan`)"
       - "traefik.http.services.tcm-web.loadbalancer.server.port=3000"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:3000/" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
