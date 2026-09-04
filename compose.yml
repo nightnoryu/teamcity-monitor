@@ -3,6 +3,10 @@ services:
     build: backend
     container_name: teamcity-monitor-backend
     restart: unless-stopped
+    volumes:
+      - "./backend/bin/teamcity-monitor:/app/bin/teamcity-monitor:ro"
+    ports:
+      - "127.0.0.1:8080:8080"
 
   teamcity-monitor-web:
     build: web
