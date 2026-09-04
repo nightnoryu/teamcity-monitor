@@ -22,6 +22,10 @@ run = "docker compose up -d --wait"
 depends = [ "backend:build" ]
 run = "docker compose restart teamcity-monitor-backend"
 
+[tasks."dev:rebuild"]
+depends = [ "backend:build" ]
+run = "docker compose up -d --wait --build"
+
 [tasks."dev:down"]
 run = "docker compose down"
 
