@@ -44,8 +44,7 @@ func runApp(ctx context.Context, config *config, logger log.Logger) error {
 	}
 
 	mode := os.Args[1]
-	switch mode {
-	case "service":
+	if mode == "service" {
 		return service(ctx, config, logger)
 	}
 	return fmt.Errorf("unknown mode: %s", mode)
