@@ -4,12 +4,17 @@ import (
 	"context"
 	stderrors "errors"
 	"io"
+	"io/fs"
 	"net/http"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/gorilla/mux"
 	"github.com/nightnoryu/go-kita/log"
+
+	"teamcity-monitor/internal/webui"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -23,6 +28,12 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
 	})
+
+	assets, err := webui.Assets()
+	if err != nil {
+		return errors.Wrap(err, "load embedded web assets")
+	}
+	router.PathPrefix("/").Handler(spaHandler(assets))
 
 	httpServer := &http.Server{
 		Handler:           router,
@@ -43,8 +54,26 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 	}()
 
 	logger.Info("Listening and serving...")
-	err := httpServer.ListenAndServe()
+	err = httpServer.ListenAndServe()
 	return translateStopErr(err, errServiceStopped)
+}
+
+func spaHandler(assets fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(assets))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if name == "" {
+			name = "index.html"
+		}
+
+		if _, statErr := fs.Stat(assets, name); statErr != nil {
+			r = r.Clone(r.Context())
+			r.URL.Path = "/"
+		}
+
+		fileServer.ServeHTTP(w, r)
+	})
 }
 
 func translateStopErr(from, to error) error {
