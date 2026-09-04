@@ -1,4 +1,4 @@
-import type {EnvironmentStatus} from "../types";
+import type {EnvironmentStatus} from "../api/types";
 import {RegionGroup} from "./RegionGroup";
 import {EnvFractionBadge} from "./StatusBadge";
 

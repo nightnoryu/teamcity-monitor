@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 
 import {fetchStatus} from "../api/status";
-import type {StatusResponse} from "../types";
+import type {StatusResponse} from "../api/types";
 
 interface UseStatusResult {
     data: StatusResponse | null;

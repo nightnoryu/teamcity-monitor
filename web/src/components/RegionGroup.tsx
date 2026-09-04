@@ -1,4 +1,4 @@
-import type {RegionGroup as RegionGroupData} from "../types";
+import type {RegionGroup as RegionGroupData} from "../api/types";
 import {ProjectRow} from "./ProjectRow";
 
 export function RegionGroup({group}: {group: RegionGroupData}) {

@@ -1,4 +1,4 @@
-import type {ProjectBuildStatus} from "../types";
+import type {ProjectBuildStatus} from "../api/types";
 import {formatDate} from "../utils/format";
 import {BuildStatusPill} from "./StatusBadge";
 

@@ -1,4 +1,4 @@
-import type {BuildStatus} from "../types";
+import type {BuildStatus} from "../api/types";
 
 const STATUS_LABEL: Record<BuildStatus, string> = {
     success: "success",

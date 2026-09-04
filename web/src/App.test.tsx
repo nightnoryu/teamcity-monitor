@@ -2,7 +2,7 @@ import {render, screen, waitFor} from "@testing-library/react";
 import {afterEach, describe, expect, it, vi} from "vitest";
 
 import {App} from "./App";
-import type {StatusResponse} from "./types";
+import type {StatusResponse} from "./api/types";
 
 vi.mock("./api/status", () => ({
     fetchStatus: vi.fn(),

@@ -1,4 +1,4 @@
-import type {EnvironmentStatus} from "../types";
+import type {EnvironmentStatus} from "../api/types";
 
 export function Footer({environments, lastUpdated}: {environments: EnvironmentStatus[]; lastUpdated: Date | null}) {
     const projectNames = new Set(
