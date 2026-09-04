@@ -3,7 +3,13 @@
 [![GitHub License](https://img.shields.io/github/license/nightnoryu/teamcity-monitor)](https://github.com/nightnoryu/teamcity-monitor/blob/main/LICENSE)
 [![Build Status](https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml)
 
-Real-time TeamCity build status monitoring.
+Real-time TeamCity environments monitoring.
+
+TODO: add screenshots
+
+## Installation
+
+TODO: add docker-compose instructions
 
 ## Local Development
 
