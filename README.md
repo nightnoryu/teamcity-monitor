@@ -21,6 +21,9 @@ cd teamcity-monitor
 # Set up local env domain
 echo "127.0.0.1 teamcity-monitor.lan" | sudo tee -a /etc/hosts
 
+# Copy the config template
+cp config.example.toml config.toml
+
 # Builds backend binary and spins up docker containers
 mise run
 ```
