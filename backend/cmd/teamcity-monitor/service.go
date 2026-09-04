@@ -39,7 +39,7 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 	tcClient := teamcity.NewClient(monCfg.TeamCityURL, monCfg.AccessToken, &http.Client{
 		Timeout: teamcityRequestTimeout,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.InsecureSkipTLSVerify}, // nolint:gosec
 		},
 	})
 	aggregator := monitor.NewAggregator(monCfg, tcClient, logger)
