@@ -8,9 +8,8 @@ RUN apk add --no-cache ca-certificates curl && \
 ADD ./bin/teamcity-monitor /app/bin/
 WORKDIR /app
 
-EXPOSE 8080
-
 USER teamcity-monitor-user
 
+EXPOSE 8080
 ENTRYPOINT [ "/app/bin/teamcity-monitor" ]
 CMD ["service"]
