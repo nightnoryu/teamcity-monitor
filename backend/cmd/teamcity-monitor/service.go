@@ -17,7 +17,11 @@ import (
 	"teamcity-monitor/internal/webui"
 )
 
-const shutdownTimeout = 10 * time.Second
+const (
+	shutdownTimeout = 10 * time.Second
+	requestTimeout  = 30 * time.Second
+	headersTimeout  = 10 * time.Second
+)
 
 var errServiceStopped = stderrors.New("service stopped without errors")
 
@@ -38,9 +42,9 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 	httpServer := &http.Server{
 		Handler:           router,
 		Addr:              config.ServeRESTAddress,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadHeaderTimeout: headersTimeout,
+		ReadTimeout:       requestTimeout,
+		WriteTimeout:      requestTimeout,
 	}
 
 	// Shutdown must use a fresh context; ctx is canceled by this point - hence the nolints
