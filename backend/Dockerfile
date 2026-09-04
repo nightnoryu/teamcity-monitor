@@ -5,7 +5,7 @@ RUN apk add --no-cache ca-certificates curl && \
     addgroup -g 1001 teamcity-monitor-user && \
     adduser -u 1001 -D -G teamcity-monitor-user -s /sbin/nologin -g "go service user" teamcity-monitor-user
 
-ADD ./bin/teamcity-monitor /app/bin/
+COPY ./bin/teamcity-monitor /app/bin/
 WORKDIR /app
 
 USER teamcity-monitor-user
