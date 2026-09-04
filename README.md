@@ -1,4 +1,7 @@
-# TeamCity Monitor
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/1d26aa56-6ee1-4867-9215-ee6a1ae0e145" alt="Screenshot" width="800" />
+  <h1>TeamCity Monitor</h1>
+</div>
 
 [![GitHub License](https://img.shields.io/github/license/nightnoryu/teamcity-monitor)](https://github.com/nightnoryu/teamcity-monitor/blob/main/LICENSE)
 [![Build Status](https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml)
