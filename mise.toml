@@ -48,7 +48,6 @@ dir = "backend"
 depends = [ "backend:modules" ]
 run = """go build \
 -trimpath -v \
---gcflags 'all=-N -l' \
 -o ./bin/teamcity-monitor ./cmd/teamcity-monitor
 """
 
