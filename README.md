@@ -22,9 +22,9 @@ services:
     container_name: teamcity-monitor
     restart: unless-stopped
     environment:
-      TEAMCITY_MONITOR_CONFIG_PATH: /app/config.toml  # Config location
-      TEAMCITY_MONITOR_POLL_INTERVAL: 20s             # Polling interval
-      TEAMCITY_MONITOR_INSECURE_SKIP_TLS_VERIFY: false        # Set to true if having issues with self-signed certs
+      TEAMCITY_MONITOR_CONFIG_PATH: /app/config.toml   # Config location
+      TEAMCITY_MONITOR_POLL_INTERVAL: 20s              # Polling interval
+      TEAMCITY_MONITOR_INSECURE_SKIP_TLS_VERIFY: false # Set to true if having issues with self-signed certs
     volumes:
       - "./config.toml:/app/config.toml" # Map your config
     ports:
