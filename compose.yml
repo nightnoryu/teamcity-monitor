@@ -25,6 +25,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.tcm-api.rule=Host(`teamcity-monitor.lan`) && PathPrefix(`/api`)"
       - "traefik.http.services.tcm-api.loadbalancer.server.port=8080"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/resilience/live" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   teamcity-monitor-web:
     build: web
