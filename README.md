@@ -16,7 +16,7 @@ Real-time TeamCity build status monitoring.
 
 ```shell
 git clone https://github.com/nightnoryu/teamcity-monitor
-cd cadence
+cd teamcity-monitor
 
 # Set up local env domain
 echo "127.0.0.1 teamcity-monitor.lan" | sudo tee -a /etc/hosts
