@@ -43,9 +43,13 @@ run = [
     { task = "web:build" },
 ]
 
-[tasks."backend:modules"]
+[tasks."backend:tidy"]
 dir = "backend"
 run = "go mod tidy"
+
+[tasks."backend:modules"]
+dir = "backend"
+run = "go mod download"
 
 [tasks."backend:build"]
 dir = "backend"
