@@ -18,21 +18,15 @@ Real-time TeamCity build status monitoring.
 git clone https://github.com/nightnoryu/teamcity-monitor
 cd cadence
 
-# Local env domain
+# Set up local env domain
 echo "127.0.0.1 teamcity-monitor.lan" | sudo tee -a /etc/hosts
 
+# Builds backend binary and spins up docker containers
 mise run
-docker compose up -d
 ```
 
-`teamcity-monitor-web` picks up changes automatically via `vite`.
-
-Build and restart `teamcity-monitor-backend` container to pick up backend changes:
-
-```shell
-mise run backend:build
-docker compose restart teamcity-monitor-backend
-```
+Web picks up changes automatically via `vite`. Backend needs to be rebuilt and restarted in order to pick up changes,
+use `mise run dev:reload` shorthand for this.
 
 ## License
 

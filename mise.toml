@@ -7,12 +7,26 @@ pnpm = "12"
 [env]
 CGO_ENABLED = "0"
 
-# Local environment setup
-
 [tasks.default]
 run = [
-    { task = "backend:build" },
+    { task = "dev" },
 ]
+
+# Local environment management
+
+[tasks.dev]
+depends = [ "backend:build" ]
+run = "docker compose up -d --wait"
+
+[tasks."dev:reload"]
+depends = [ "backend:build" ]
+run = "docker compose restart teamcity-monitor-backend"
+
+[tasks."dev:down"]
+run = "docker compose down"
+
+[tasks."dev:logs"]
+run = "docker compose logs -f"
 
 # Builds
 
