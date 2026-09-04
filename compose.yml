@@ -30,6 +30,7 @@ services:
     environment:
       TEAMCITY_MONITOR_SERVE_REST_ADDRESS: :8080
       TEAMCITY_MONITOR_CONFIG_PATH: /app/config.toml
+      TEAMCITY_MONITOR_POLL_INTERVAL: 20s
     volumes:
       - "./backend/bin/teamcity-monitor:/app/bin/teamcity-monitor:ro"
       - "./config.toml:/app/config.toml:ro"

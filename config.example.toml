@@ -1,2 +1,19 @@
 teamcity_url = "https://teamcity.your-org.lan"
 access_token = "abc..."
+
+[[projects]]
+name = "Alpha"
+id = "Alpha_Testing"
+environment_branch_param = "alpha_%s_branch"
+monitored_builds = [
+    { environment = "dev", name = "ru", id = "Alpha_Testing_Dev_Ru" },
+    { environment = "dev", name = "eu", id = "Alpha_Testing_Dev_Eu" },
+]
+
+[[environments]]
+name = "dev"
+emoji = "🥭"
+
+[[environments]]
+name = "stage"
+emoji = "☢️"
