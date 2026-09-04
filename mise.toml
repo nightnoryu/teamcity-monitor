@@ -7,6 +7,12 @@ pnpm = "12"
 [env]
 CGO_ENABLED = "0"
 
+[tasks.default]
+run = [
+    { task = "backend:build" },
+    { task = "web:build" },
+]
+
 # Backend build
 
 [tasks."backend:modules"]
@@ -23,7 +29,15 @@ run = """go build \
 """
 
 # Web build
-# TODO
+
+[tasks."web:modules"]
+dir = "web"
+run = "pnpm install --frozen-lockfile"
+
+[tasks."web:build"]
+dir = "web"
+depends = [ "web:modules" ]
+run = "pnpm run build"
 
 # Tests
 
