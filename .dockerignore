@@ -1,0 +1,11 @@
+.idea/
+.vscode/
+
+.git/
+.github/
+
+backend/bin/
+backend/internal/webui/dist/
+
+web/node_modules/
+web/dist/
