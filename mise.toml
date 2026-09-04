@@ -7,12 +7,20 @@ pnpm = "12"
 [env]
 CGO_ENABLED = "0"
 
+# Local environment setup
+
 [tasks.default]
 run = [
     { task = "backend:build" },
 ]
 
-# Backend build
+# Builds
+
+[tasks.build]
+run = [
+    { task = "backend:build" },
+    { task = "web:build" },
+]
 
 [tasks."backend:modules"]
 dir = "backend"
@@ -26,8 +34,6 @@ run = """go build \
 --gcflags 'all=-N -l' \
 -o ./bin/teamcity-monitor ./cmd/teamcity-monitor
 """
-
-# Web build
 
 [tasks."web:modules"]
 dir = "web"
