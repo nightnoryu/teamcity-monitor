@@ -1,0 +1,58 @@
+[tools]
+go = "1.26"
+golangci-lint = "2.12.2"
+node = "26"
+pnpm = "12"
+
+[env]
+CGO_ENABLED = "0"
+
+# Backend build
+
+[tasks."backend:modules"]
+dir = "backend"
+run = "go mod tidy"
+
+[tasks."backend:build"]
+dir = "backend"
+depends = [ "backend:modules" ]
+run = """go build \
+-trimpath -v \
+--gcflags 'all=-N -l' \
+-o ./bin/teamcity-monitor ./cmd/teamcity-monitor
+"""
+
+# Web build
+# TODO
+
+# Tests
+
+[tasks.test]
+run = [
+    { task = "backend:test" },
+    { task = "web:test" },
+]
+
+[tasks."backend:test"]
+dir = "backend"
+run = "go test ./..."
+
+[tasks."web:test"]
+dir = "web"
+run = "pnpm run test"
+
+# Linting
+
+[tasks.lint]
+run = [
+    { task = "backend:lint" },
+    { task = "web:lint" },
+]
+
+[tasks."backend:lint"]
+dir = "backend"
+run = [ "golangci-lint run" ]
+
+[tasks."web:lint"]
+dir = "web"
+run = [ "pnpm run lint" ]
