@@ -1,4 +1,4 @@
-import type {StatusResponse} from "../api/types";
+import type {StatusResponse} from "./types.ts";
 
 export async function fetchStatus(signal?: AbortSignal): Promise<StatusResponse> {
     const response = await fetch("/api/status", {signal});
