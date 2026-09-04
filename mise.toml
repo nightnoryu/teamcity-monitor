@@ -10,7 +10,6 @@ CGO_ENABLED = "0"
 [tasks.default]
 run = [
     { task = "backend:build" },
-    { task = "web:build" },
 ]
 
 # Backend build

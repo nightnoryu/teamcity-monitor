@@ -1,12 +1,30 @@
 services:
+  teamcity-monitor-ingress:
+    image: traefik:v3.7
+    container_name: teamcity-monitor-ingress
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    depends_on:
+      - teamcity-monitor-backend
+      - teamcity-monitor-web
+
   teamcity-monitor-backend:
     build: backend
     container_name: teamcity-monitor-backend
     restart: unless-stopped
     volumes:
       - "./backend/bin/teamcity-monitor:/app/bin/teamcity-monitor:ro"
-    ports:
-      - "127.0.0.1:8080:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tcm-api.rule=Host(`teamcity-monitor.lan`) && PathPrefix(`/api`)"
+      - "traefik.http.services.tcm-api.loadbalancer.server.port=8080"
 
   teamcity-monitor-web:
     build: web
@@ -15,7 +33,7 @@ services:
     volumes:
       - "./web:/app"
       - "/app/node_modules"
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - teamcity-monitor-backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tcm-web.rule=Host(`teamcity-monitor.lan`)"
+      - "traefik.http.services.tcm-web.loadbalancer.server.port=3000"
