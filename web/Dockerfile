@@ -7,6 +7,7 @@ COPY pnpm-lock.yaml .
 
 RUN pnpm install --frozen-lockfile
 
+WORKDIR /app
 COPY . .
 
 EXPOSE 3000
