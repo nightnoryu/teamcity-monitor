@@ -39,6 +39,14 @@ dir = "web"
 depends = [ "web:modules" ]
 run = "pnpm run build"
 
+# Checks
+
+[tasks.check]
+run = [
+    { task = "test" },
+    { task = "lint" },
+]
+
 # Tests
 
 [tasks.test]
