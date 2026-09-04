@@ -5,11 +5,30 @@
 
 Real-time TeamCity environments monitoring.
 
-TODO: add screenshots
-
 ## Installation
 
-TODO: add docker-compose instructions
+### Config
+
+Copy `config.example.toml` and fill it in according to the template.
+
+### Running
+
+Run with docker-compose:
+
+```yaml
+services:
+  teamcity-monitor:
+    image: ghcr.io/nightnoryu/teamcity-monitor:latest
+    container_name: teamcity-monitor
+    restart: unless-stopped
+    environment:
+      TEAMCITY_MONITOR_CONFIG_PATH: /app/config.toml  # Config location
+      TEAMCITY_MONITOR_POLL_INTERVAL: 20s             # Polling interval
+    volumes:
+      - "./config.toml:/app/config.toml" # Map your config
+    ports:
+      - "8080:8080"
+```
 
 ## Local Development
 
