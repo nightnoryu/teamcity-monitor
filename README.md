@@ -6,7 +6,7 @@
   <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache"></a>
 </p>
 
-A lightweight environment dashboard for TeamCity.
+Lightweight self-hosted dashboard for monitoring TeamCity environments and deployments.
 
 > [!NOTE]
 > This is not a replacement for TeamCity UI or CLI. This project provides a high-level environment view for teams that need to see the state of multiple environments at a glance.
