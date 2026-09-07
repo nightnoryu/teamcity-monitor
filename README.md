@@ -8,6 +8,9 @@
 
 A lightweight environment dashboard for TeamCity.
 
+> [!NOTE]
+> This is not a replacement for TeamCity UI or CLI. This project provides a high-level environment view for teams that need to see the state of multiple environments at a glance.
+
 ## ✅ Features
 
 - Environment and project-oriented dashboard
