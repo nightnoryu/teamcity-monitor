@@ -48,7 +48,7 @@ TODO
 
 TODO
 
-## 🛠 Local Development
+## ⚒️ Local Development
 
 ### Prerequisites
 
