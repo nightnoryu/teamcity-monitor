@@ -6,12 +6,20 @@
   <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache"></a>
 </p>
 
-Real-time TeamCity environments monitoring.
+A lightweight environment dashboard for TeamCity.
+
+## ✅ Features
+
+- Environment and project-oriented dashboard
+- Multiple builds per environment
+- Real-time build status polling
+- Lightweight Go backend
+- Packaged in a single docker container
 
 ## 🚀 Quick Start
 
 1. Copy `config.example.toml` and fill it in according to the template.
-2. Run with docker-compose
+2. Run with docker-compose with the following config
 
     ```yaml
     services:
@@ -28,6 +36,14 @@ Real-time TeamCity environments monitoring.
         ports:
           - "8080:8080"
     ```
+
+## ⚙️ Configuration
+
+TODO
+
+## 🏗️ Architecture
+
+TODO
 
 ## 🛠 Local Development
 
