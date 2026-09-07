@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/nightnoryu/go-kita/env"
 	"github.com/nightnoryu/go-kita/jsonlog"
 	"github.com/nightnoryu/go-kita/log"
+	"github.com/nightnoryu/go-kita/runtime"
 )
 
 const appID = "teamcity_monitor"
@@ -37,7 +36,7 @@ func runApp(ctx context.Context, config *config, logger log.Logger) error {
 	ctx, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
 
-	ctx = listenOSKillSignals(ctx)
+	ctx = runtime.ListenOSKillSignals(ctx)
 
 	if len(os.Args) != 2 {
 		return errors.New("mode argument not provided")
@@ -55,21 +54,4 @@ func initLogger() log.MainLogger {
 		Level:   jsonlog.InfoLevel,
 		AppName: appID,
 	})
-}
-
-func listenOSKillSignals(ctx context.Context) context.Context {
-	var cancelFunc context.CancelFunc
-	ctx, cancelFunc = context.WithCancel(ctx)
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
-		select {
-		case <-ch:
-			cancelFunc()
-		case <-ctx.Done():
-			signal.Reset()
-			return
-		}
-	}()
-	return ctx
 }

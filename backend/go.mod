@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/go-faster/errors v0.8.0
 	github.com/gorilla/mux v1.8.1
-	github.com/nightnoryu/go-kita v1.3.0
+	github.com/nightnoryu/go-kita v1.4.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/stretchr/testify v1.12.1
 )
