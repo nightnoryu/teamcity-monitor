@@ -1,4 +1,4 @@
-<p align="center"><img src="https://github.com/user-attachments/assets/1d26aa56-6ee1-4867-9215-ee6a1ae0e145" width="800" title="TeamCity Monitor Screenshot"></p>
+<p align="center"><img src="https://github.com/user-attachments/assets/3448061c-3640-475b-956a-aa75e943d39b" width="800" title="TeamCity Monitor Screenshot"></p>
 
 <p align="center">
   <a href="https://github.com/nightnoryu/teamcity-monitor/releases"><img src="https://img.shields.io/github/release/nightnoryu/teamcity-monitor.svg?cache-control=no-cache"></a>
