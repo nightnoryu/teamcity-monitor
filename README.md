@@ -42,11 +42,72 @@ Lightweight self-hosted dashboard for monitoring TeamCity environments and deplo
 
 ## ⚙️ Configuration
 
-TODO
+There are two layers of configuration: runtime settings passed as environment
+variables, and the monitoring domain model described in `config.toml`.
+
+### Environment variables
+
+All variables are prefixed with `TEAMCITY_MONITOR_`.
+
+| Variable                    | Default            | Description                                                       |
+|-----------------------------|--------------------|-----------------------------------------------------------------|
+| `SERVE_REST_ADDRESS`        | `:8080`            | Address the HTTP server listens on.                              |
+| `CONFIG_PATH`               | `/app/config.toml` | Path to the `config.toml` file.                                  |
+| `POLL_INTERVAL`             | `20s`              | How often TeamCity is polled for fresh build statuses.           |
+| `INSECURE_SKIP_TLS_VERIFY`  | `false`            | Skip TLS verification for TeamCity requests (self-signed certs). |
+
+### `config.toml`
+
+```toml
+teamcity_url = "https://teamcity.your-org.lan"
+access_token = "abc..."
+
+[[projects]]
+name = "Alpha"                               # Display name
+id = "Alpha_Testing"                         # TeamCity project ID
+environment_branch_param = "alpha_%s_branch" # See below
+monitored_builds = [
+    { environment = "dev", name = "ru", id = "Alpha_Testing_Dev_Ru" },
+    { environment = "dev", name = "eu", id = "Alpha_Testing_Dev_Eu" },
+]
+
+[[environments]]
+name = "dev"
+emoji = "🥭"
+
+[[environments]]
+name = "stage"
+emoji = "☢️"
+```
+
+- `access_token` is a TeamCity access token; it needs read access to the
+  monitored projects and their audit log.
+- `[[projects]]` lists the TeamCity projects to monitor. Each `monitored_builds`
+  entry pins one build configuration (`id`) to an environment (`environment`)
+  and a grouping/display key (`name`, e.g. a region - free-form, not an enum).
+- `environment_branch_param` is a template with exactly one `%s`, substituted
+  with the environment name to produce the name of a TeamCity project
+  parameter. Its edit history in the audit log is used to show who last changed
+  the deployed branch for that environment.
+- `[[environments]]` declares the deployment tiers shown on the dashboard, in
+  the order columns appear.
+
+The config is validated on load: every `monitored_builds.environment` must
+reference a declared environment, project and build IDs must be unique, and
+`environment_branch_param` must contain exactly one `%s`.
 
 ## 🏗️ Architecture
 
-TODO
+The application is a single Go binary with an embedded React frontend.
+
+```
+                 ┌───────────────────────────── teamcity-monitor ─────────────────────────────┐
+  TeamCity  ◄────┤  Poller ──► Aggregator ──► in-memory Snapshot ──► GET /api/status           │
+  REST API       │   (every POLL_INTERVAL)         cache            embedded SPA (/, static)   │
+                 └───────────────────────────────────────▲───────────────────────────────────┘
+                                                         │ polls /api/status
+                                                    React + Vite SPA
+```
 
 ## ⚒️ Local Development
 
