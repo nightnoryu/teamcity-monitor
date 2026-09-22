@@ -4,8 +4,6 @@
 .git/
 .github/
 
-# Runtime credentials are mounted by the deployment and must never be sent to
-# a Docker builder.
 config.toml
 
 backend/bin/
