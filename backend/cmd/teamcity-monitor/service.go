@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	stderrors "errors"
-	"io"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"path"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/gorilla/mux"
+	"github.com/nightnoryu/go-kita/health"
 	"github.com/nightnoryu/go-kita/log"
 
 	"teamcity-monitor/internal/monitor"
@@ -53,10 +54,12 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 
 	router := mux.NewRouter()
 
-	router.HandleFunc("/resilience/live", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
-	})
+	live, ready, err := healthHandlers(poller, logger)
+	if err != nil {
+		return errors.Wrap(err, "create health handlers")
+	}
+	router.Handle("/livez", live).Methods(http.MethodGet)
+	router.Handle("/healthz", ready).Methods(http.MethodGet)
 	router.HandleFunc("/api/status", statusHandler(poller)).Methods(http.MethodGet)
 
 	assets, err := webui.Assets()
@@ -91,6 +94,39 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 		<-shutdownDone
 	}
 	return translateStopErr(err, errServiceStopped)
+}
+
+// healthHandlers exposes process liveness separately from collection readiness.
+// A partial snapshot is still useful to serve, while a failed collection means
+// the dashboard has no current TeamCity data and is therefore not ready.
+func healthHandlers(poller *monitor.Poller, logger log.Logger) (live http.Handler, ready http.Handler, err error) {
+	live, err = health.NewLivenessHandler(health.LivenessConfig{})
+	if err != nil {
+		return nil, nil, err
+	}
+	ready, err = health.NewReadinessHandler(health.ReadinessConfig{
+		Checks: []health.NamedCheck{{Name: "collection", Check: collectionReadinessCheck(poller)}},
+		OnFailure: func(name string, err error) {
+			logger.Error(err, name+" readiness check failed")
+		},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return live, ready, nil
+}
+
+func collectionReadinessCheck(poller *monitor.Poller) health.Check {
+	return func(context.Context) error {
+		snapshot, ready := poller.Snapshot()
+		if !ready {
+			return stderrors.New("initial collection has not completed")
+		}
+		if snapshot.CollectionHealth == monitor.CollectionFailed {
+			return fmt.Errorf("latest collection failed (%d build fetches failed)", snapshot.FailedBuilds)
+		}
+		return nil
+	}
 }
 
 func spaHandler(assets fs.FS) http.Handler {
