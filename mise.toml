@@ -42,9 +42,18 @@ run = "docker compose logs -f"
 
 [tasks.build]
 run = [
-    { task = "backend:build" },
     { task = "web:build" },
+    { task = "backend:package" },
 ]
+
+[tasks."backend:package"]
+run = '''
+backup=$(mktemp)
+cp backend/internal/webui/dist/index.html "$backup"
+trap 'cp "$backup" backend/internal/webui/dist/index.html; rm -f "$backup"' EXIT
+cp -R web/dist/. backend/internal/webui/dist/
+mise run backend:build
+'''
 
 [tasks."backend:tidy"]
 dir = "backend"
@@ -84,12 +93,17 @@ run = [
 [tasks.test]
 run = [
     { task = "backend:test" },
+    { task = "backend:test:race" },
     { task = "web:test" },
 ]
 
 [tasks."backend:test"]
 dir = "backend"
 run = "go test ./..."
+
+[tasks."backend:test:race"]
+dir = "backend"
+run = "CGO_ENABLED=1 go test -race ./internal/monitor"
 
 [tasks."web:test"]
 dir = "web"

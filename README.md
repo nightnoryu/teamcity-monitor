@@ -6,7 +6,7 @@
   <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache"></a>
 </p>
 
-Lightweight self-hosted dashboard for monitoring TeamCity environments and deployments.
+Lightweight self-hosted dashboard for monitoring the latest TeamCity build attempts for each configured environment.
 
 > [!NOTE]
 > This is not a replacement for TeamCity UI or CLI. This project provides a high-level environment view for teams that need to see the state of multiple environments at a glance.
@@ -18,6 +18,13 @@ Lightweight self-hosted dashboard for monitoring TeamCity environments and deplo
 - Real-time build status polling
 - Lightweight Go backend
 - Packaged in a single docker container
+
+The dashboard reports the latest attempt for each build configuration, including
+queued, running, failed, and canceled attempts. A newer attempt replaces the
+previous success in this view. A successful build indicates a deployment only
+when that build configuration actually performs deployment; the dashboard does
+not independently check the runtime environment or retain the last successful
+deployment. Use the TeamCity build link for investigation.
 
 ## 🚀 Quick Start
 
@@ -88,13 +95,23 @@ emoji = "☢️"
 - `environment_branch_param` is a template with exactly one `%s`, substituted
   with the environment name to produce the name of a TeamCity project
   parameter. Its edit history in the audit log is used to show who last changed
-  the deployed branch for that environment.
+  the configured branch for that environment. Other `%` directives are invalid.
+- `teamcity_url` must be an absolute HTTP(S) URL with a host. A context path is
+  supported; query strings and fragments are not.
 - `[[environments]]` declares the deployment tiers shown on the dashboard, in
   the order columns appear.
 
 The config is validated on load: every `monitored_builds.environment` must
 reference a declared environment, project and build IDs must be unique, and
-`environment_branch_param` must contain exactly one `%s`.
+`environment_branch_param` must contain exactly one literal `%s`. Environment
+names must be unique, and project and build display names must not be blank.
+
+Branch parameter editor attribution is best effort. It scans the 100 most
+recent project settings edit events for an exact `Value of the parameter X
+changed` comment. The access token needs audit-log read permission. A missing
+match, including an older event or differently worded edit, is shown separately
+from an audit request failure. The editor is not necessarily the person who
+triggered or deployed the displayed build.
 
 ## 🏗️ Architecture
 
@@ -134,6 +151,9 @@ mise run dev
 
 Web picks up changes automatically via `vite`. Backend needs to be rebuilt and restarted in order to pick up changes,
 use `mise run dev:reload` shorthand for this.
+
+`mise run build` builds and stages the frontend before compiling the production
+single binary. `mise run backend:build` remains a quick backend development build.
 
 ## 📜 License
 

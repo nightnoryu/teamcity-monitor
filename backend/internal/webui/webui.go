@@ -9,9 +9,8 @@ import (
 	"github.com/go-faster/errors"
 )
 
-// dist holds the built frontend bundle. In local development it only contains a
-// placeholder index.html; the real bundle is produced by `vite build` and copied
-// in during the container image build.
+// dist holds the built frontend bundle. The production build task stages the
+// Vite output here before compiling Go; development builds use the placeholder.
 //
 //go:embed all:dist
 var dist embed.FS
