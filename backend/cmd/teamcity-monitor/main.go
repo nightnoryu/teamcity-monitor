@@ -4,19 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdlog "log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/nightnoryu/go-kita/env"
 	"github.com/nightnoryu/go-kita/jsonlog"
 	"github.com/nightnoryu/go-kita/log"
-	"github.com/nightnoryu/go-kita/runtime"
 )
 
 const appID = "teamcity_monitor"
 
 func main() {
-	ctx := context.Background()
-	logger := initLogger()
+	ctx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancelFunc()
+
+	logger, err := initLogger()
+	if err != nil {
+		stdlog.Fatal(err)
+	}
 	defer func() { _ = logger.Sync() }()
 
 	cnf, err := env.ParseEnv[config](appID)
@@ -33,11 +40,6 @@ func main() {
 }
 
 func runApp(ctx context.Context, config *config, logger log.Logger) error {
-	ctx, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
-
-	ctx = runtime.ListenOSKillSignals(ctx)
-
 	if len(os.Args) != 2 {
 		return errors.New("mode argument not provided")
 	}
@@ -49,7 +51,7 @@ func runApp(ctx context.Context, config *config, logger log.Logger) error {
 	return fmt.Errorf("unknown mode: %s", mode)
 }
 
-func initLogger() log.MainLogger {
+func initLogger() (log.MainLogger, error) {
 	return jsonlog.NewLogger(&jsonlog.Config{
 		Level:   jsonlog.InfoLevel,
 		AppName: appID,

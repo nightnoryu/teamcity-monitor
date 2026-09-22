@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/nightnoryu/go-kita/jsonlog"
+	"github.com/nightnoryu/go-kita/log"
 	"github.com/stretchr/testify/require"
 
 	"teamcity-monitor/internal/teamcity"
@@ -36,8 +37,11 @@ func (f *fakeFetcher) LastParameterChangeAuthor(_ context.Context, _, paramName 
 	return "", teamcity.ErrNoAuditRecord
 }
 
-func testLogger() *jsonlog.Config {
-	return &jsonlog.Config{Level: jsonlog.ErrorLevel, AppName: "test"}
+func newTestLogger(t *testing.T) log.MainLogger {
+	t.Helper()
+	logger, err := jsonlog.NewLogger(&jsonlog.Config{Level: jsonlog.ErrorLevel, AppName: "test"})
+	require.NoError(t, err)
+	return logger
 }
 
 func TestAggregator_BuildSnapshot_PartialFailureDoesNotBlankSnapshot(t *testing.T) {
@@ -53,7 +57,7 @@ func TestAggregator_BuildSnapshot_PartialFailureDoesNotBlankSnapshot(t *testing.
 		},
 	}
 
-	logger := jsonlog.NewLogger(testLogger())
+	logger := newTestLogger(t)
 	aggregator := NewAggregator(sampleConfig(), fetcher, logger)
 
 	snapshot := aggregator.BuildSnapshot(t.Context())
@@ -85,7 +89,7 @@ func TestAggregator_BuildSnapshot_SuccessFraction(t *testing.T) {
 		},
 	}
 
-	logger := jsonlog.NewLogger(testLogger())
+	logger := newTestLogger(t)
 	aggregator := NewAggregator(sampleConfig(), fetcher, logger)
 
 	snapshot := aggregator.BuildSnapshot(t.Context())
@@ -106,7 +110,7 @@ func TestAggregator_BuildSnapshot_InProgressBuildShowsAsRunning(t *testing.T) {
 		},
 	}
 
-	logger := jsonlog.NewLogger(testLogger())
+	logger := newTestLogger(t)
 	aggregator := NewAggregator(sampleConfig(), fetcher, logger)
 
 	snapshot := aggregator.BuildSnapshot(t.Context())
@@ -130,7 +134,7 @@ func TestAggregator_BuildSnapshot_BranchChangedByAppliesToAllRowsInGroup(t *test
 		},
 	}
 
-	logger := jsonlog.NewLogger(testLogger())
+	logger := newTestLogger(t)
 	aggregator := NewAggregator(sampleConfig(), fetcher, logger)
 
 	snapshot := aggregator.BuildSnapshot(t.Context())
@@ -148,7 +152,7 @@ func TestAggregator_BuildSnapshot_NoBuildsIsUnknownWithoutError(t *testing.T) {
 		},
 	}
 
-	logger := jsonlog.NewLogger(testLogger())
+	logger := newTestLogger(t)
 	aggregator := NewAggregator(sampleConfig(), fetcher, logger)
 
 	snapshot := aggregator.BuildSnapshot(t.Context())
