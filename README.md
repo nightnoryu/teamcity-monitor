@@ -44,7 +44,7 @@ deployment. Use the TeamCity build link for investigation.
         volumes:
           - "./config.toml:/app/config.toml" # Map your config
         ports:
-          - "8080:8080"
+          - "127.0.0.1:8080:8080" # Keep the unauthenticated service private
     ```
 
 ## ⚙️ Configuration
@@ -112,6 +112,53 @@ changed` comment. The access token needs audit-log read permission. A missing
 match, including an older event or differently worded edit, is shown separately
 from an audit request failure. The editor is not necessarily the person who
 triggered or deployed the displayed build.
+
+### Health endpoints
+
+- `GET /livez` is process liveness. It is `200` while the HTTP service is
+  running, including before the first poll and during a TeamCity outage.
+- `GET /healthz` is readiness and collection health. It is `503` until the
+  initial collection completes and when the latest collection failed for every
+  monitored build. A partial collection remains ready because the dashboard
+  can still serve the available build statuses.
+
+The API response at `GET /api/status` carries the detailed
+`collectionHealth`, `failedBuilds`, snapshot timestamps, and per-build errors.
+
+## Access model
+
+This service deliberately has **no authentication or authorization**. It is
+intended for trusted internal corporate networks only. The quick-start mapping
+binds it to loopback; use an internal load balancer or reverse proxy with
+network access controls to publish it to colleagues. Do not expose the service
+directly to the public internet: both the dashboard and `/api/status` reveal
+deployment metadata.
+
+If broader access is required, put an authenticated TLS reverse proxy in front
+of the service and do not publish the application's port. For example, an
+NGINX virtual host can require Basic Auth before proxying to the private
+container:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name teamcity-monitor.example.com;
+    # Configure certificate directives here.
+
+    auth_basic "TeamCity Monitor";
+    auth_basic_user_file /etc/nginx/teamcity-monitor.htpasswd;
+
+    location / {
+        proxy_pass http://teamcity-monitor:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Mount a password file generated with `htpasswd`, restrict the proxy's network
+access as appropriate, and use your organization’s SSO-aware proxy instead of
+Basic Auth where available.
 
 ## 🏗️ Architecture
 
