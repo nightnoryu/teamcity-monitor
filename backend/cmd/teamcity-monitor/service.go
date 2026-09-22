@@ -99,7 +99,7 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 // healthHandlers exposes process liveness separately from collection readiness.
 // A partial snapshot is still useful to serve, while a failed collection means
 // the dashboard has no current TeamCity data and is therefore not ready.
-func healthHandlers(poller *monitor.Poller, logger log.Logger) (live http.Handler, ready http.Handler, err error) {
+func healthHandlers(poller *monitor.Poller, logger log.Logger) (live, ready http.Handler, err error) {
 	live, err = health.NewLivenessHandler(health.LivenessConfig{})
 	if err != nil {
 		return nil, nil, err
