@@ -2,30 +2,29 @@
 
 ## Project Structure & Module Organization
 
-`backend/` contains the Go service: `cmd/teamcity-monitor/` wires up the server, while `internal/teamcity/`, `internal/monitor/`, and `internal/monitorconfig/` handle API access, polling and aggregation, and configuration. `web/src/` contains the React dashboard, with components, hooks, API types, styles, and nearby tests. Root files include the example configuration, Dockerfiles, Compose setup, and `mise.toml` task definitions. CI lives in `.github/workflows/`.
+`backend/cmd/teamcity-monitor/` starts the Go HTTP service. Code in `backend/internal/` handles TeamCity requests, configuration, polling, aggregation, and web UI delivery. `web/src/` contains the React dashboard: `components/`, `hooks/`, `api/`, `utils/`, and `styles/`. Tests sit beside the code they cover. Root files provide the example configuration, Docker Compose setup, and `mise.toml` tasks; CI is in `.github/workflows/`.
 
 ## Build, Test, and Development Commands
 
-Install the tool versions declared in `mise.toml` (Go, Node, pnpm, and golangci-lint). Copy `config.example.toml` to `config.toml` and set a TeamCity URL and access token before starting the stack.
+Install the Go, Node, pnpm, and golangci-lint versions declared in `mise.toml`. Copy `config.example.toml` to `config.toml` and supply your TeamCity URL and access token for local runs.
 
-- `mise run` builds the backend and starts the local Docker Compose stack.
-- `mise run dev:reload` rebuilds and restarts the backend after Go changes; Vite reloads frontend changes automatically.
-- `mise run build` builds both the Go binary and production web assets.
-- `mise run check` runs all tests and linters. Use `mise run test` or `mise run lint` for either group alone.
-- `mise run dev:down` stops the local stack.
+- `mise run`: build both parts, then run tests and linters; this is the CI command.
+- `mise run dev`: build the backend and start the Docker Compose stack. Frontend edits reload through Vite.
+- `mise run dev:reload`: rebuild and restart the backend after Go changes. `mise run dev:down` stops the stack.
+- `mise run build`, `mise run test`, and `mise run lint`: run those stages separately. Use `mise run backend:test` or `mise run web:test` for a focused test pass.
 
 ## Coding Style & Naming Conventions
 
-Format Go with `gofmt`; keep package names lowercase and tests in adjacent `*_test.go` files. Follow the existing TypeScript/React style: four-space indentation in TSX, double-quoted strings, PascalCase component files, and `use` prefixes for hooks. Keep shared API shapes in `web/src/api/`. The frontend uses ESLint with TypeScript, React Hooks, and React Refresh rules; the backend uses `golangci-lint`.
+Format Go with `gofmt`; use lowercase package names and adjacent `*_test.go` files. Follow existing frontend style: four-space TSX indentation, double-quoted strings, PascalCase component files, and `use` prefixes for hooks. Put shared API types in `web/src/api/`. ESLint checks TypeScript and React rules; `golangci-lint` checks Go.
 
 ## Testing Guidelines
 
-Go tests use the standard `testing` package and `testify`; frontend tests use Vitest, jsdom, and Testing Library. Place frontend tests beside their components as `*.test.tsx`. Add focused tests for polling, aggregation, configuration, or UI behavior when changing those paths. Run `mise run check` before opening a pull request. CI also builds both parts; no coverage threshold is configured.
+Go tests use `testing` and `testify`. Frontend tests use Vitest, jsdom, and Testing Library; name them `*.test.tsx` beside the component. Add focused behavior tests when changing configuration, TeamCity fetching, polling, aggregation, or UI states. Run `mise run` before a pull request. No coverage threshold is configured.
 
 ## Commit & Pull Request Guidelines
 
-Recent commits use short, imperative subjects such as `Fix import` and `Add tls setting`; follow that pattern and keep each commit focused. In pull requests, describe the behavior changed, link a relevant issue when one exists, and include screenshots for visible dashboard changes. Ensure the CI build and check jobs pass.
+Recent commits use short, imperative subjects, such as `Reject invalid poll intervals`. Keep commits focused. In pull requests, describe the behavior change, link a relevant issue when available, and add screenshots for visible dashboard changes. Confirm CI passes.
 
 ## Security & Configuration
 
-Keep TeamCity access tokens in local `config.toml`, which is gitignored. Update `config.example.toml` with safe placeholders when adding configuration. Leave TLS verification enabled unless a local self-signed setup requires otherwise.
+Keep access tokens in the gitignored `config.toml`. Add safe placeholders to `config.example.toml` when introducing settings. Keep TLS verification enabled except when a local self-signed setup requires otherwise.
