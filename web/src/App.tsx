@@ -38,7 +38,7 @@ export function App() {
                             <EnvironmentCard key={environment.name} environment={environment} />
                         ))}
                     </div>
-                    <Footer environments={environments} generatedAt={data.generatedAt} lastSuccessfulAt={data.lastSuccessfulAt} now={now} />
+                    <Footer environments={environments} generatedAt={data.generatedAt} lastSuccessfulAt={data.lastSuccessfulAt} pollDurationMs={data.pollDurationMs} failedBuilds={data.failedBuilds} now={now} />
                 </>
             )}
         </div>

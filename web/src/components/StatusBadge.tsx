@@ -5,6 +5,7 @@ const STATUS_LABEL: Record<BuildStatus, string> = {
     failure: "failed",
     error: "error",
     running: "running",
+    queued: "queued",
     unknown: "never run",
     unavailable: "unavailable",
 };
@@ -14,6 +15,7 @@ const STATUS_GLYPH: Record<BuildStatus, string> = {
     failure: "❌",
     error: "⚠",
     running: "⏳",
+    queued: "⌛",
     unknown: "❔",
     unavailable: "⚠",
 };

@@ -40,8 +40,8 @@ describe("App", () => {
                         {
                             name: "ru",
                             builds: [
-                                {projectName: "Alpha", status: "success"},
-                                {projectName: "Beta", status: "success"},
+                                {projectId: "A", buildId: "A_Ru", buildName: "ru", attributionStatus: "not_found", projectName: "Alpha", status: "success"},
+                                {projectId: "B", buildId: "B_Ru", buildName: "ru", attributionStatus: "not_found", projectName: "Beta", status: "success"},
                             ],
                         },
                     ],
@@ -66,8 +66,8 @@ describe("App", () => {
         mockedFetchStatus.mockResolvedValue({
             ready: true, generatedAt: new Date().toISOString(), collectionHealth: "partial",
             environments: [{name: "dev", emoji: "", successCount: 0, totalCount: 2, groups: [{name: "ru", builds: [
-                {projectName: "Alpha", status: "unavailable", error: "teamcity: unauthorized"},
-                {projectName: "Beta", status: "unknown"},
+                {projectId: "A", buildId: "A_Ru", buildName: "ru", attributionStatus: "error", projectName: "Alpha", status: "unavailable", error: "teamcity: unauthorized"},
+                {projectId: "B", buildId: "B_Ru", buildName: "ru", attributionStatus: "not_found", projectName: "Beta", status: "unknown"},
             ]}]}],
         });
         render(<App />);

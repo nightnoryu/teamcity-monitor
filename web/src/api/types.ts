@@ -1,10 +1,14 @@
-export type BuildStatus = "success" | "failure" | "error" | "running" | "unknown" | "unavailable";
+export type BuildStatus = "success" | "failure" | "error" | "running" | "queued" | "unknown" | "unavailable";
 
 export interface ProjectBuildStatus {
+    projectId: string;
+    buildId: string;
+    buildName: string;
     projectName: string;
     status: BuildStatus;
     branch?: string;
     buildNumber?: string;
+    statusText?: string;
     startedAt?: string;
     finishedAt?: string;
     triggeredBy?: string;
@@ -13,6 +17,7 @@ export interface ProjectBuildStatus {
      * this environment, per TeamCity's audit log. Best-effort: absent if no
      * exact "Value of the parameter X changed" audit event was found. */
     branchChangedBy?: string;
+    attributionStatus: "pending" | "found" | "not_found" | "error";
     error?: string;
 }
 
@@ -35,5 +40,7 @@ export interface StatusResponse {
     generatedAt?: string;
     lastSuccessfulAt?: string;
     collectionHealth?: "healthy" | "partial" | "failed";
+    pollDurationMs?: number;
+    failedBuilds?: number;
     environments?: EnvironmentStatus[];
 }

@@ -16,47 +16,59 @@ export function useStatus(intervalMs: number): UseStatusResult {
     const [loading, setLoading] = useState(true);
 
     const abortRef = useRef<AbortController | null>(null);
-    const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const mountedRef = useRef(false);
+    const loadRef = useRef<() => Promise<void>>(async () => {});
 
     const load = useCallback(async () => {
-        abortRef.current?.abort();
+        if (!mountedRef.current || abortRef.current) return;
         const controller = new AbortController();
         abortRef.current = controller;
+        const timeout = setTimeout(() => controller.abort("Status request timed out"), Math.max(intervalMs, 30000));
 
         setLoading(true);
         try {
             const response = await fetchStatus(controller.signal);
-            setData(response);
-            setError(null);
+            if (mountedRef.current && abortRef.current === controller && !controller.signal.aborted) {
+                setData(response);
+                setError(null);
+            }
         } catch (err) {
-            if (controller.signal.aborted) return;
-            setError(err instanceof Error ? err.message : "failed to load status");
+            if (mountedRef.current && abortRef.current === controller) {
+                setError(controller.signal.aborted ? "Status request timed out" : err instanceof Error ? err.message : "failed to load status");
+            }
         } finally {
-            if (!controller.signal.aborted) setLoading(false);
+            clearTimeout(timeout);
+            const current = mountedRef.current && abortRef.current === controller;
+            if (abortRef.current === controller) abortRef.current = null;
+            if (current) {
+                setLoading(false);
+                timerRef.current = setTimeout(() => void loadRef.current(), intervalMs);
+            }
         }
-    }, []);
+    }, [intervalMs]);
 
-    const scheduleInterval = useCallback(() => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => void load(), intervalMs);
-    }, [load, intervalMs]);
+    useEffect(() => { loadRef.current = load; }, [load]);
 
     useEffect(() => {
         // load() sets loading state synchronously before its first await;
         // deferring the call to a microtask keeps that setState out of the
         // effect body itself, as react-hooks/set-state-in-effect requires.
-        void Promise.resolve().then(load);
-        scheduleInterval();
+        mountedRef.current = true;
+        void Promise.resolve().then(() => { if (mountedRef.current) void load(); });
         return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
+            mountedRef.current = false;
+            if (timerRef.current) clearTimeout(timerRef.current);
             abortRef.current?.abort();
+            abortRef.current = null;
         };
-    }, [load, scheduleInterval]);
+    }, [load]);
 
     const refresh = useCallback(() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (abortRef.current) return;
         void load();
-        scheduleInterval();
-    }, [load, scheduleInterval]);
+    }, [load]);
 
     return {data, error, loading, refresh};
 }
