@@ -129,7 +129,7 @@ echo "127.0.0.1 teamcity-monitor.lan" | sudo tee -a /etc/hosts
 cp config.example.toml config.toml
 
 # Builds backend binary and spins up docker containers
-mise run
+mise run dev
 ```
 
 Web picks up changes automatically via `vite`. Backend needs to be rebuilt and restarted in order to pick up changes,
