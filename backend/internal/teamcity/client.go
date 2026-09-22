@@ -30,7 +30,7 @@ const (
 	// snapshot-dependencies(...) is a second fallback for deploy-only build
 	// configurations with no VCS checkout of their own (triggered purely via
 	// a snapshot dependency on a build that does have one).
-	buildFields = "build(number,status,statusText,state,branchName,startDate,finishDate,webUrl," +
+	buildFields = "build(number,status,statusText,state,canceled,failedToStart,branchName,startDate,finishDate,webUrl," +
 		"triggered(type,user(username,name)),revisions(revision(vcsBranchName))," +
 		"snapshot-dependencies(build(branchName,revisions(revision(vcsBranchName)))))"
 
@@ -87,10 +87,12 @@ var (
 
 // Build is the subset of a TeamCity build's data the dashboard needs.
 type Build struct {
-	Number     string
-	Status     Status
-	StatusText string
-	State      State
+	Number        string
+	Status        Status
+	StatusText    string
+	State         State
+	Canceled      bool
+	FailedToStart bool
 	// Branch is the actual VCS branch the build ran on, as reported by
 	// TeamCity, not a build parameter value.
 	Branch      string
@@ -117,7 +119,9 @@ func NewClient(baseURL, token string, httpClient *http.Client) *Client {
 // LatestBuild fetches the most recent build of the given build type,
 // including one still queued or running.
 func (c *Client) LatestBuild(ctx context.Context, buildTypeID string) (Build, error) {
-	url := c.baseURL + "/app/rest/buildTypes/id:" + buildTypeID + "/builds/?locator=count:1,state:any&fields=" + buildFields
+	// Personal builds are private runs; canceled and failed-to-start builds
+	// are attempts operators need to see across all branches.
+	url := c.baseURL + "/app/rest/buildTypes/id:" + buildTypeID + "/builds/?locator=count:1,state:any,defaultFilter:false,branch:default:any,personal:false,canceled:any,failedToStart:any&fields=" + buildFields
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
@@ -221,6 +225,8 @@ type buildDTO struct {
 	Status               Status                  `json:"status"`
 	StatusText           string                  `json:"statusText"`
 	State                State                   `json:"state"`
+	Canceled             bool                    `json:"canceled"`
+	FailedToStart        bool                    `json:"failedToStart"`
 	BranchName           string                  `json:"branchName"`
 	StartDate            string                  `json:"startDate"`
 	FinishDate           string                  `json:"finishDate"`
@@ -280,15 +286,17 @@ func (b buildDTO) toBuild() (Build, error) {
 	}
 
 	return Build{
-		Number:      b.Number,
-		Status:      b.Status,
-		StatusText:  b.StatusText,
-		State:       b.State,
-		Branch:      normalizeBranch(b.branch()),
-		StartedAt:   startedAt,
-		FinishedAt:  finishedAt,
-		TriggeredBy: b.Triggered.triggeredBy(),
-		WebURL:      b.WebURL,
+		Number:        b.Number,
+		Status:        b.Status,
+		StatusText:    b.StatusText,
+		State:         b.State,
+		Canceled:      b.Canceled,
+		FailedToStart: b.FailedToStart,
+		Branch:        normalizeBranch(b.branch()),
+		StartedAt:     startedAt,
+		FinishedAt:    finishedAt,
+		TriggeredBy:   b.Triggered.triggeredBy(),
+		WebURL:        b.WebURL,
 	}, nil
 }
 

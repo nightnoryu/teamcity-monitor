@@ -54,6 +54,38 @@ func TestLatestBuild_Success(t *testing.T) {
 	require.True(t, build.StartedAt.Equal(wantStart))
 }
 
+func TestLatestBuild_LocatorSelectsNewerBranchFailure(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		locator := r.URL.Query().Get("locator")
+		assert.Equal(t, "count:1,state:any,defaultFilter:false,branch:default:any,personal:false,canceled:any,failedToStart:any", locator)
+		fields := r.URL.Query().Get("fields")
+		assert.Contains(t, fields, "canceled,failedToStart")
+		assert.Contains(t, fields, "statusText,state")
+		// Mimic TeamCity's default-branch filtering: the older success is
+		// returned unless the request explicitly includes all branches.
+		if locator != "count:1,state:any,defaultFilter:false,branch:default:any,personal:false,canceled:any,failedToStart:any" {
+			_, _ = w.Write([]byte(`{"build":[{"number":"1","status":"SUCCESS","state":"finished","branchName":"main"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"build":[{"number":"2","status":"FAILURE","state":"finished","branchName":"feature/new"}]}`))
+	})
+	build, err := client.LatestBuild(t.Context(), "id")
+	require.NoError(t, err)
+	require.Equal(t, "2", build.Number)
+	require.Equal(t, "feature/new", build.Branch)
+	require.Equal(t, teamcity.StatusFailure, build.Status)
+}
+
+func TestLatestBuild_DecodesCanceledAndFailedToStart(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"build":[{"state":"finished","canceled":true,"failedToStart":true}]}`))
+	})
+	build, err := client.LatestBuild(t.Context(), "id")
+	require.NoError(t, err)
+	require.True(t, build.Canceled)
+	require.True(t, build.FailedToStart)
+}
+
 func TestLatestBuild_RunningBuildHasNoFinishDate(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{
