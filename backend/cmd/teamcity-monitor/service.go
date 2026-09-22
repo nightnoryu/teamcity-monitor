@@ -31,6 +31,9 @@ const (
 var errServiceStopped = stderrors.New("service stopped without errors")
 
 func service(ctx context.Context, config *config, logger log.Logger) error {
+	if err := config.validate(); err != nil {
+		return err
+	}
 	monCfg, err := monitorconfig.Load(config.ConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "load monitor config")
