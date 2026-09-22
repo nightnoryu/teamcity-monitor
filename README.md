@@ -1,206 +1,71 @@
-<p align="center"><img src="https://github.com/user-attachments/assets/3448061c-3640-475b-956a-aa75e943d39b" width="800" title="TeamCity Monitor Screenshot"></p>
+<p align="center"><img src="https://github.com/user-attachments/assets/3448061c-3640-475b-956a-aa75e943d39b" width="800" alt="TeamCity Monitor dashboard"></p>
 
 <p align="center">
-  <a href="https://github.com/nightnoryu/teamcity-monitor/releases"><img src="https://img.shields.io/github/release/nightnoryu/teamcity-monitor.svg?cache-control=no-cache"></a>
-  <a href="https://github.com/nightnoryu/teamcity-monitor/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nightnoryu/teamcity-monitor?cache-control=no-cache"></a>
-  <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache"></a>
+  <a href="https://github.com/nightnoryu/teamcity-monitor/releases"><img src="https://img.shields.io/github/release/nightnoryu/teamcity-monitor.svg?cache-control=no-cache" alt="Latest release"></a>
+  <a href="https://github.com/nightnoryu/teamcity-monitor/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nightnoryu/teamcity-monitor?cache-control=no-cache" alt="License"></a>
+  <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache" alt="CI status"></a>
 </p>
 
-Lightweight self-hosted dashboard for monitoring the latest TeamCity build attempts for each configured environment.
+# TeamCity Monitor
+
+*A clear, shared view of your latest deployments.*
+
+**TeamCity Monitor** is a lightweight, self-hosted dashboard that turns the
+latest TeamCity build attempts into an environment-oriented view. See what is
+running, queued, successful, failed, or unavailable across the projects and
+regions you care about—without digging through individual build configurations.
 
 > [!NOTE]
-> This is not a replacement for TeamCity UI or CLI. This project provides a high-level environment view for teams that need to see the state of multiple environments at a glance.
+> This is a high-level operational view, not a replacement for TeamCity. A
+> successful build means a deployment only when that build configuration
+> performs deployment; use the linked TeamCity build to investigate details.
 
-## ✅ Features
+## ✨ Features
 
 - Environment and project-oriented dashboard
-- Multiple builds per environment
-- Real-time build status polling
-- Lightweight Go backend
-- Packaged in a single docker container
+- Multiple build configurations per environment and grouping
+- Continuous TeamCity polling with partial-failure reporting
+- Latest branch, build number, trigger, timing, and TeamCity build link
+- Best-effort attribution of the last environment-branch parameter change
+- One static Go binary with an embedded React frontend
 
-The dashboard reports the latest attempt for each build configuration, including
-queued, running, failed, and canceled attempts. A newer attempt replaces the
-previous success in this view. A successful build indicates a deployment only
-when that build configuration actually performs deployment; the dashboard does
-not independently check the runtime environment or retain the last successful
-deployment. Use the TeamCity build link for investigation.
+## 🚀 Run your own
 
-## 🚀 Quick Start
-
-1. Copy `config.example.toml` and fill it in according to the template.
-2. Run with docker-compose with the following config
-
-    ```yaml
-    services:
-      teamcity-monitor:
-        image: ghcr.io/nightnoryu/teamcity-monitor:latest
-        container_name: teamcity-monitor
-        restart: unless-stopped
-        environment:
-          TEAMCITY_MONITOR_CONFIG_PATH: /app/config.toml   # Config location
-          TEAMCITY_MONITOR_POLL_INTERVAL: 20s              # Polling interval
-          TEAMCITY_MONITOR_INSECURE_SKIP_TLS_VERIFY: false # Set to true if having issues with self-signed certs
-        volumes:
-          - "./config.toml:/app/config.toml" # Map your config
-        ports:
-          - "127.0.0.1:8080:8080" # Keep the unauthenticated service private
-    ```
-
-## ⚙️ Configuration
-
-There are two layers of configuration: runtime settings passed as environment
-variables, and the monitoring domain model described in `config.toml`.
-
-### Environment variables
-
-All variables are prefixed with `TEAMCITY_MONITOR_`.
-
-| Variable                    | Default            | Description                                                       |
-|-----------------------------|--------------------|-----------------------------------------------------------------|
-| `SERVE_REST_ADDRESS`        | `:8080`            | Address the HTTP server listens on.                              |
-| `CONFIG_PATH`               | `/app/config.toml` | Path to the `config.toml` file.                                  |
-| `POLL_INTERVAL`             | `20s`              | How often TeamCity is polled for fresh build statuses.           |
-| `INSECURE_SKIP_TLS_VERIFY`  | `false`            | Skip TLS verification for TeamCity requests (self-signed certs). |
-
-### `config.toml`
-
-```toml
-teamcity_url = "https://teamcity.your-org.lan"
-access_token = "abc..."
-
-[[projects]]
-name = "Alpha"                               # Display name
-id = "Alpha_Testing"                         # TeamCity project ID
-environment_branch_param = "alpha_%s_branch" # See below
-monitored_builds = [
-    { environment = "dev", name = "ru", id = "Alpha_Testing_Dev_Ru" },
-    { environment = "dev", name = "eu", id = "Alpha_Testing_Dev_Eu" },
-]
-
-[[environments]]
-name = "dev"
-emoji = "🥭"
-
-[[environments]]
-name = "stage"
-emoji = "☢️"
-```
-
-- `access_token` is a TeamCity access token; it needs read access to the
-  monitored projects and their audit log.
-- `[[projects]]` lists the TeamCity projects to monitor. Each `monitored_builds`
-  entry pins one build configuration (`id`) to an environment (`environment`)
-  and a grouping/display key (`name`, e.g. a region - free-form, not an enum).
-- `environment_branch_param` is a template with exactly one `%s`, substituted
-  with the environment name to produce the name of a TeamCity project
-  parameter. Its edit history in the audit log is used to show who last changed
-  the configured branch for that environment. Other `%` directives are invalid.
-- `teamcity_url` must be an absolute HTTP(S) URL with a host. A context path is
-  supported; query strings and fragments are not.
-- `[[environments]]` declares the deployment tiers shown on the dashboard, in
-  the order columns appear.
-
-The config is validated on load: every `monitored_builds.environment` must
-reference a declared environment, project and build IDs must be unique, and
-`environment_branch_param` must contain exactly one literal `%s`. Environment
-names must be unique, and project and build display names must not be blank.
-
-Branch parameter editor attribution is best effort. It scans the 100 most
-recent project settings edit events for an exact `Value of the parameter X
-changed` comment. The access token needs audit-log read permission. A missing
-match, including an older event or differently worded edit, is shown separately
-from an audit request failure. The editor is not necessarily the person who
-triggered or deployed the displayed build.
-
-### Health endpoints
-
-- `GET /livez` is process liveness. It is `200` while the HTTP service is
-  running, including before the first poll and during a TeamCity outage.
-- `GET /healthz` is readiness and collection health. It is `503` until the
-  initial collection completes and when the latest collection failed for every
-  monitored build. A partial collection remains ready because the dashboard
-  can still serve the available build statuses.
-
-The API response at `GET /api/status` carries the detailed
-`collectionHealth`, `failedBuilds`, snapshot timestamps, and per-build errors.
-
-## Access model
-
-This service deliberately has **no authentication or authorization**. It is
-intended for trusted internal corporate networks only. The quick-start mapping
-binds it to loopback; use an internal load balancer or reverse proxy with
-network access controls to publish it to colleagues. Do not expose the service
-directly to the public internet: both the dashboard and `/api/status` reveal
-deployment metadata.
-
-If broader access is required, put an authenticated TLS reverse proxy in front
-of the service and do not publish the application's port. For example, an
-NGINX virtual host can require Basic Auth before proxying to the private
-container:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name teamcity-monitor.example.com;
-    # Configure certificate directives here.
-
-    auth_basic "TeamCity Monitor";
-    auth_basic_user_file /etc/nginx/teamcity-monitor.htpasswd;
-
-    location / {
-        proxy_pass http://teamcity-monitor:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Mount a password file generated with `htpasswd`, restrict the proxy's network
-access as appropriate, and use your organization’s SSO-aware proxy instead of
-Basic Auth where available.
-
-## 🏗️ Architecture
-
-The application is a single Go binary with an embedded React frontend.
-
-```
-                 ┌───────────────────────────── teamcity-monitor ─────────────────────────────┐
-  TeamCity  ◄────┤  Poller ──► Aggregator ──► in-memory Snapshot ──► GET /api/status           │
-  REST API       │   (every POLL_INTERVAL)         cache            embedded SPA (/, static)   │
-                 └───────────────────────────────────────▲───────────────────────────────────┘
-                                                         │ polls /api/status
-                                                    React + Vite SPA
-```
-
-## ⚒️ Local Development
-
-### Prerequisites
-
-- [mise](https://mise.jdx.dev)
-- Docker with docker-compose-plugin
-
-### First launch
+Create a `config.toml` from [the example](config.example.toml), set your
+TeamCity URL and access token, then run the published image:
 
 ```shell
-git clone https://github.com/nightnoryu/teamcity-monitor
-cd teamcity-monitor
+docker run -d --name teamcity-monitor \
+  --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 \
+  -v "$(pwd)/config.toml:/app/config.toml:ro" \
+  ghcr.io/nightnoryu/teamcity-monitor:latest
+```
 
-# Set up local env domain
-echo "127.0.0.1 teamcity-monitor.lan" | sudo tee -a /etc/hosts
+The service has no built-in authentication. Keep it on a trusted internal
+network, or put an authenticated reverse proxy in front of it.
 
-# Copy the config template
-cp config.example.toml config.toml
+See the [deployment guide](docs/deployment.md) for Compose, configuration,
+health checks, and operational guidance.
 
-# Builds backend binary and spins up docker containers
+## 📚 Documentation
+
+- [Architecture](docs/architecture.md) — components, data flow, polling, and API behavior
+- [Deployment guide](docs/deployment.md) — configuration, Docker, health checks, and access model
+- [Example monitor configuration](config.example.toml)
+- [Changelog](CHANGELOG.md)
+
+## ⚒️ Local development
+
+Install [mise](https://mise.jdx.dev) and Docker with the Compose plugin, copy
+`config.example.toml` to `config.toml`, then run:
+
+```shell
 mise run dev
 ```
 
-Web picks up changes automatically via `vite`. Backend needs to be rebuilt and restarted in order to pick up changes,
-use `mise run dev:reload` shorthand for this.
-
-`mise run build` builds and stages the frontend before compiling the production
-single binary. `mise run backend:build` remains a quick backend development build.
+Vite reloads frontend changes. After Go changes, run `mise run dev:reload`.
+`mise run` performs the full build, test, and lint pass.
 
 ## 📜 License
 
