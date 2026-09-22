@@ -37,10 +37,10 @@ services:
       - "./config.toml:/app/config.toml:ro"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tcm-api.rule=Host(`teamcity-monitor.lan`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.tcm-api.rule=Host(`teamcity-monitor.lan`) && (PathPrefix(`/api`) || Path(`/healthz`) || Path(`/livez`))"
       - "traefik.http.services.tcm-api.loadbalancer.server.port=8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/resilience/live" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/livez" ]
       interval: 5s
       timeout: 5s
       retries: 5
