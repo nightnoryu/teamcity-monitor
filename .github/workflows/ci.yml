@@ -21,8 +21,5 @@ jobs:
           install: true
           cache: true
 
-      - name: Build
-        run: mise run build
-
-      - name: Check
-        run: mise run check
+      - name: Run full build
+        run: mise run
