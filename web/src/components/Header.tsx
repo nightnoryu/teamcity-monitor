@@ -1,4 +1,5 @@
-export function Header({loading, onRefresh}: {loading: boolean; onRefresh: () => void}) {
+export function Header({loading, state, onRefresh}: {loading: boolean; state: "connecting" | "live" | "partial" | "failed" | "disconnected" | "stale"; onRefresh: () => void}) {
+    const labels = {connecting: "Connecting", live: "Live", partial: "Partial TeamCity failure", failed: "TeamCity unavailable", disconnected: "Browser disconnected", stale: "Snapshot stale"};
     return (
         <header className="dashboard-header">
             <div className="header-left">
@@ -8,8 +9,8 @@ export function Header({loading, onRefresh}: {loading: boolean; onRefresh: () =>
                 </h1>
             </div>
             <div className="header-right">
-                <span className="status-dot" />
-                <span className="live-label">Live</span>
+                <span className={`status-dot ${state}`} />
+                <span className="live-label">{labels[state]}</span>
                 <button
                     className={`refresh-btn${loading ? " spinning" : ""}`}
                     onClick={onRefresh}

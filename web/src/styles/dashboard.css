@@ -77,6 +77,12 @@ body {
     animation: pulse-dot 2s infinite;
 }
 
+.header-right .status-dot.partial,
+.header-right .status-dot.stale { background: #eab308; animation: none; }
+.header-right .status-dot.failed,
+.header-right .status-dot.disconnected { background: #ef4444; animation: none; }
+.header-right .status-dot.connecting { background: #94a3b8; animation: none; }
+
 @keyframes pulse-dot {
     0%,
     100% {
@@ -344,11 +350,14 @@ body {
 }
 
 .project-details .build-status.failure,
-.project-details .build-status.error {
+.project-details .build-status.error,
+.project-details .build-status.unavailable {
     color: #dc2626;
     border-color: #fecaca;
     background: #fef2f2;
 }
+
+.build-error { color: #b91c1c; font-size: 11px; overflow-wrap: anywhere; }
 
 .project-details .build-status.unknown {
     color: #64748b;

@@ -19,6 +19,9 @@ func NewPoller(aggregator *Aggregator, interval time.Duration) *Poller {
 	return &Poller{aggregator: aggregator, interval: interval}
 }
 
+// Interval is the configured time between collection cycles.
+func (p *Poller) Interval() time.Duration { return p.interval }
+
 // Snapshot returns the latest cached snapshot. ready is false until the
 // first refresh (in Run) has completed.
 func (p *Poller) Snapshot() (snapshot *Snapshot, ready bool) {
@@ -45,5 +48,11 @@ func (p *Poller) Run(ctx context.Context) {
 }
 
 func (p *Poller) refresh(ctx context.Context) {
-	p.current.Store(p.aggregator.BuildSnapshot(ctx))
+	snapshot := p.aggregator.BuildSnapshot(ctx)
+	if snapshot.CollectionHealth == CollectionHealthy {
+		snapshot.LastSuccessfulAt = &snapshot.GeneratedAt
+	} else if previous := p.current.Load(); previous != nil {
+		snapshot.LastSuccessfulAt = previous.LastSuccessfulAt
+	}
+	p.current.Store(snapshot)
 }

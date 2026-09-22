@@ -20,6 +20,7 @@ export function ProjectRow({build}: {build: ProjectBuildStatus}) {
                 )}
                 {build.finishedAt && <span className="deploy-date">🕐 {formatDate(build.finishedAt)}</span>}
                 <BuildStatusPill status={build.status} />
+                {build.error && <span className="build-error" role="alert">{build.error}</span>}
             </div>
         </div>
     );

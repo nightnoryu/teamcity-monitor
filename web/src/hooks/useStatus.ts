@@ -7,7 +7,6 @@ interface UseStatusResult {
     data: StatusResponse | null;
     error: string | null;
     loading: boolean;
-    lastUpdated: Date | null;
     refresh: () => void;
 }
 
@@ -15,7 +14,6 @@ export function useStatus(intervalMs: number): UseStatusResult {
     const [data, setData] = useState<StatusResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const abortRef = useRef<AbortController | null>(null);
     const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -30,7 +28,6 @@ export function useStatus(intervalMs: number): UseStatusResult {
             const response = await fetchStatus(controller.signal);
             setData(response);
             setError(null);
-            setLastUpdated(new Date());
         } catch (err) {
             if (controller.signal.aborted) return;
             setError(err instanceof Error ? err.message : "failed to load status");
@@ -61,5 +58,5 @@ export function useStatus(intervalMs: number): UseStatusResult {
         scheduleInterval();
     }, [load, scheduleInterval]);
 
-    return {data, error, loading, lastUpdated, refresh};
+    return {data, error, loading, refresh};
 }

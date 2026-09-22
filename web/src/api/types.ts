@@ -1,4 +1,4 @@
-export type BuildStatus = "success" | "failure" | "error" | "running" | "unknown";
+export type BuildStatus = "success" | "failure" | "error" | "running" | "unknown" | "unavailable";
 
 export interface ProjectBuildStatus {
     projectName: string;
@@ -31,6 +31,9 @@ export interface EnvironmentStatus {
 
 export interface StatusResponse {
     ready: boolean;
+    pollIntervalMs?: number;
     generatedAt?: string;
+    lastSuccessfulAt?: string;
+    collectionHealth?: "healthy" | "partial" | "failed";
     environments?: EnvironmentStatus[];
 }

@@ -5,7 +5,8 @@ const STATUS_LABEL: Record<BuildStatus, string> = {
     failure: "failed",
     error: "error",
     running: "running",
-    unknown: "unknown",
+    unknown: "never run",
+    unavailable: "unavailable",
 };
 
 const STATUS_GLYPH: Record<BuildStatus, string> = {
@@ -14,6 +15,7 @@ const STATUS_GLYPH: Record<BuildStatus, string> = {
     error: "⚠",
     running: "⏳",
     unknown: "❔",
+    unavailable: "⚠",
 };
 
 export function BuildStatusPill({status}: {status: BuildStatus}) {

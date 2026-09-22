@@ -1,4 +1,4 @@
-import {render, screen, waitFor} from "@testing-library/react";
+import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {afterEach, describe, expect, it, vi} from "vitest";
 
 import {App} from "./App";
@@ -27,7 +27,9 @@ describe("App", () => {
     it("renders environment cards once data is ready", async () => {
         const response: StatusResponse = {
             ready: true,
-            generatedAt: "2026-09-02T14:23:12Z",
+            generatedAt: new Date().toISOString(),
+            lastSuccessfulAt: new Date().toISOString(),
+            collectionHealth: "healthy",
             environments: [
                 {
                     name: "dev",
@@ -53,6 +55,55 @@ describe("App", () => {
         await waitFor(() => expect(screen.getByText("dev")).toBeInTheDocument());
         expect(screen.getByText("Alpha")).toBeInTheDocument();
         expect(screen.getByText("2 / 2")).toBeInTheDocument();
+        expect(screen.getByText("Live")).toBeInTheDocument();
+        const checked = screen.getByText(/Snapshot checked:/).textContent;
+        fireEvent.click(screen.getByRole("button", {name: "Refresh data"}));
+        await waitFor(() => expect(mockedFetchStatus).toHaveBeenCalledTimes(2));
+        expect(screen.getByText(/Snapshot checked:/).textContent).toBe(checked);
+    });
+
+    it("shows upstream failure and row errors separately from browser connectivity", async () => {
+        mockedFetchStatus.mockResolvedValue({
+            ready: true, generatedAt: new Date().toISOString(), collectionHealth: "partial",
+            environments: [{name: "dev", emoji: "", successCount: 0, totalCount: 2, groups: [{name: "ru", builds: [
+                {projectName: "Alpha", status: "unavailable", error: "teamcity: unauthorized"},
+                {projectName: "Beta", status: "unknown"},
+            ]}]}],
+        });
+        render(<App />);
+        expect(await screen.findByText("Partial TeamCity failure")).toBeInTheDocument();
+        expect(screen.getByText("teamcity: unauthorized")).toBeInTheDocument();
+        expect(screen.getByText("never run")).toBeInTheDocument();
+        expect(screen.getByText(/Last successful collection: never/)).toBeInTheDocument();
+    });
+
+    it("shows total upstream failure", async () => {
+        mockedFetchStatus.mockResolvedValue({ready: true, generatedAt: new Date().toISOString(), collectionHealth: "failed", environments: []});
+        render(<App />);
+        expect(await screen.findByText("TeamCity unavailable")).toBeInTheDocument();
+    });
+
+    it("marks a retained snapshot as cached after browser failure", async () => {
+        mockedFetchStatus.mockResolvedValueOnce({ready: true, generatedAt: new Date().toISOString(), collectionHealth: "healthy", environments: []});
+        mockedFetchStatus.mockRejectedValueOnce(new Error("network down"));
+        render(<App />);
+        expect(await screen.findByText("Live")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", {name: "Refresh data"}));
+        expect(await screen.findByText("Browser disconnected")).toBeInTheDocument();
+        expect(screen.getByText(/Showing a cached snapshot/)).toBeInTheDocument();
+    });
+
+    it("marks an old but reachable snapshot as stale", async () => {
+        mockedFetchStatus.mockResolvedValue({ready: true, generatedAt: new Date(Date.now() - 120_000).toISOString(), collectionHealth: "healthy", environments: []});
+        render(<App />);
+        expect(await screen.findByText("Snapshot stale")).toBeInTheDocument();
+    });
+
+    it("uses the backend poll interval when judging freshness", async () => {
+        mockedFetchStatus.mockResolvedValue({ready: true, generatedAt: new Date(Date.now() - 50_000).toISOString(), pollIntervalMs: 60_000, collectionHealth: "healthy", environments: []});
+        render(<App />);
+        expect(await screen.findByText("Live")).toBeInTheDocument();
+        expect(screen.queryByText(/Snapshot is stale/)).toBeNull();
     });
 
     it("shows an error banner when the request fails", async () => {

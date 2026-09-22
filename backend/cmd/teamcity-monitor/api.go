@@ -12,18 +12,23 @@ import (
 // poller hasn't completed its first refresh yet; Environments/GeneratedAt
 // are omitted in that case rather than sent as empty/zero values.
 type statusResponse struct {
-	Ready        bool                        `json:"ready"`
-	GeneratedAt  *time.Time                  `json:"generatedAt,omitempty"`
-	Environments []monitor.EnvironmentStatus `json:"environments,omitempty"`
+	Ready            bool                        `json:"ready"`
+	PollIntervalMs   int64                       `json:"pollIntervalMs"`
+	GeneratedAt      *time.Time                  `json:"generatedAt,omitempty"`
+	LastSuccessfulAt *time.Time                  `json:"lastSuccessfulAt,omitempty"`
+	CollectionHealth monitor.CollectionHealth    `json:"collectionHealth,omitempty"`
+	Environments     []monitor.EnvironmentStatus `json:"environments,omitempty"`
 }
 
 func statusHandler(poller *monitor.Poller) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		snapshot, ready := poller.Snapshot()
 
-		resp := statusResponse{Ready: ready}
+		resp := statusResponse{Ready: ready, PollIntervalMs: poller.Interval().Milliseconds()}
 		if ready {
 			resp.GeneratedAt = &snapshot.GeneratedAt
+			resp.LastSuccessfulAt = snapshot.LastSuccessfulAt
+			resp.CollectionHealth = snapshot.CollectionHealth
 			resp.Environments = snapshot.Environments
 		}
 

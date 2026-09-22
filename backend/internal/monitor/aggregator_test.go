@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/nightnoryu/go-kita/jsonlog"
@@ -18,6 +19,8 @@ type fakeFetcher struct {
 
 	authorByParam map[string]string
 	authorErr     error
+	auditWait     <-chan struct{}
+	auditEntered  chan<- struct{}
 }
 
 func (f *fakeFetcher) LatestBuild(_ context.Context, buildTypeID string) (teamcity.Build, error) {
@@ -28,6 +31,15 @@ func (f *fakeFetcher) LatestBuild(_ context.Context, buildTypeID string) (teamci
 }
 
 func (f *fakeFetcher) LastParameterChangeAuthor(_ context.Context, _, paramName string) (string, error) {
+	if f.auditEntered != nil {
+		select {
+		case f.auditEntered <- struct{}{}:
+		default:
+		}
+	}
+	if f.auditWait != nil {
+		<-f.auditWait
+	}
 	if f.authorErr != nil {
 		return "", f.authorErr
 	}
@@ -35,6 +47,20 @@ func (f *fakeFetcher) LastParameterChangeAuthor(_ context.Context, _, paramName 
 		return author, nil
 	}
 	return "", teamcity.ErrNoAuditRecord
+}
+
+func TestAggregator_GeneratedAtPrecedesAuditEnrichment(t *testing.T) {
+	wait := make(chan struct{})
+	entered := make(chan struct{}, 1)
+	fetcher := &fakeFetcher{auditWait: wait, auditEntered: entered}
+	aggregator := NewAggregator(sampleConfig(), fetcher, newTestLogger(t))
+	done := make(chan *Snapshot, 1)
+	go func() { done <- aggregator.BuildSnapshot(t.Context()) }()
+	<-entered
+	releasedAt := time.Now().UTC()
+	close(wait)
+	snapshot := <-done
+	require.True(t, snapshot.GeneratedAt.Before(releasedAt), "build freshness must not include optional audit delay")
 }
 
 func newTestLogger(t *testing.T) log.MainLogger {
@@ -70,7 +96,8 @@ func TestAggregator_BuildSnapshot_PartialFailureDoesNotBlankSnapshot(t *testing.
 	require.Equal(t, BuildSuccess, ruGroup.Builds[1].Status, "Beta ru succeeded")
 
 	euGroup := dev.Groups[1]
-	require.Equal(t, BuildUnknown, euGroup.Builds[0].Status, "Alpha eu fetch failed")
+	require.Equal(t, BuildUnavailable, euGroup.Builds[0].Status, "Alpha eu fetch failed")
+	require.Equal(t, CollectionPartial, snapshot.CollectionHealth)
 	require.NotEmpty(t, euGroup.Builds[0].Error)
 	require.Equal(t, BuildSuccess, euGroup.Builds[1].Status, "Beta eu succeeded despite Alpha eu failing")
 
@@ -160,4 +187,44 @@ func TestAggregator_BuildSnapshot_NoBuildsIsUnknownWithoutError(t *testing.T) {
 	row := snapshot.Environments[0].Groups[0].Builds[0]
 	require.Equal(t, BuildUnknown, row.Status)
 	require.Empty(t, row.Error)
+	require.Equal(t, CollectionHealthy, snapshot.CollectionHealth)
+}
+
+func TestAggregator_BuildSnapshot_TotalFailure(t *testing.T) {
+	cfg := sampleConfig()
+	fetcher := &fakeFetcher{errByID: map[string]error{}}
+	// Every configured build fails through the same fake error.
+	_, tasks, _ := planTasks(cfg)
+	for _, task := range tasks {
+		fetcher.errByID[task.buildTypeID] = errors.New("authorization failed")
+	}
+	snapshot := NewAggregator(cfg, fetcher, newTestLogger(t)).BuildSnapshot(t.Context())
+	require.Equal(t, CollectionFailed, snapshot.CollectionHealth)
+	for _, group := range snapshot.Environments[0].Groups {
+		for _, row := range group.Builds {
+			require.Equal(t, BuildUnavailable, row.Status)
+			require.Contains(t, row.Error, "authorization failed")
+		}
+	}
+}
+
+func TestPoller_PreservesLastSuccessfulCollectionThroughFailure(t *testing.T) {
+	cfg := sampleConfig()
+	fetcher := &fakeFetcher{byBuildTypeID: map[string]teamcity.Build{}}
+	poller := NewPoller(NewAggregator(cfg, fetcher, newTestLogger(t)), time.Second)
+	poller.refresh(t.Context())
+	first, ready := poller.Snapshot()
+	require.True(t, ready)
+	require.Equal(t, CollectionHealthy, first.CollectionHealth)
+	require.NotNil(t, first.LastSuccessfulAt)
+
+	fetcher.errByID = map[string]error{}
+	_, tasks, _ := planTasks(cfg)
+	for _, task := range tasks {
+		fetcher.errByID[task.buildTypeID] = errors.New("connection refused")
+	}
+	poller.refresh(t.Context())
+	second, _ := poller.Snapshot()
+	require.Equal(t, CollectionFailed, second.CollectionHealth)
+	require.Equal(t, first.LastSuccessfulAt, second.LastSuccessfulAt)
 }

@@ -49,6 +49,9 @@ func (a *Aggregator) BuildSnapshot(ctx context.Context) *Snapshot {
 	forEachConcurrent(tasks, fetchConcurrency, func(task fetchTask) {
 		a.fetchInto(ctx, skeleton, task)
 	})
+	// Audit enrichment runs afterward and may be slow. Timestamp the build
+	// results when they were actually collected, before optional enrichment.
+	buildCollectedAt := time.Now().UTC()
 	forEachConcurrent(auditTasks, fetchConcurrency, func(task auditTask) {
 		a.fetchAuditInto(ctx, skeleton, task)
 	})
@@ -56,8 +59,25 @@ func (a *Aggregator) BuildSnapshot(ctx context.Context) *Snapshot {
 	for i := range skeleton {
 		fillCounts(&skeleton[i])
 	}
-
-	return &Snapshot{GeneratedAt: time.Now().UTC(), Environments: skeleton}
+	var total, failed int
+	for _, env := range skeleton {
+		for _, group := range env.Groups {
+			for _, row := range group.Builds {
+				total++
+				if row.Status == BuildUnavailable {
+					failed++
+				}
+			}
+		}
+	}
+	health := CollectionHealthy
+	if failed > 0 {
+		health = CollectionPartial
+	}
+	if total > 0 && failed == total {
+		health = CollectionFailed
+	}
+	return &Snapshot{GeneratedAt: buildCollectedAt, CollectionHealth: health, Environments: skeleton}
 }
 
 // forEachConcurrent runs fn over items with at most concurrency in flight,
@@ -94,7 +114,7 @@ func (a *Aggregator) fetchInto(ctx context.Context, skeleton []EnvironmentStatus
 	case errors.Is(err, teamcity.ErrNoBuilds):
 		row.Status = BuildUnknown
 	case err != nil:
-		row.Status = BuildUnknown
+		row.Status = BuildUnavailable
 		row.Error = err.Error()
 		a.logger.Error(err, "fetch latest build failed for ", task.buildTypeID, " (", task.projectName, ")")
 	default:
@@ -137,6 +157,9 @@ func fillRow(row *ProjectBuildStatus, build teamcity.Build) {
 }
 
 func mapStatus(build teamcity.Build) BuildStatus {
+	if build.Canceled || build.FailedToStart {
+		return BuildError
+	}
 	if build.State == teamcity.StateQueued || build.State == teamcity.StateRunning {
 		return BuildRunning
 	}

@@ -7,21 +7,30 @@ import "time"
 // BuildStatus is the dashboard-facing status of a monitored build.
 type BuildStatus string
 
-// Dashboard build statuses. Unknown covers both "never run" and "fetch
-// failed" — the frontend does not need to distinguish those. Running covers
-// both TeamCity's "queued" and "running" states.
+// Unknown means no build has run. Unavailable means collection failed.
 const (
-	BuildSuccess BuildStatus = "success"
-	BuildFailure BuildStatus = "failure"
-	BuildError   BuildStatus = "error"
-	BuildRunning BuildStatus = "running"
-	BuildUnknown BuildStatus = "unknown"
+	BuildSuccess     BuildStatus = "success"
+	BuildFailure     BuildStatus = "failure"
+	BuildError       BuildStatus = "error"
+	BuildRunning     BuildStatus = "running"
+	BuildUnknown     BuildStatus = "unknown"
+	BuildUnavailable BuildStatus = "unavailable"
+)
+
+type CollectionHealth string
+
+const (
+	CollectionHealthy CollectionHealth = "healthy"
+	CollectionPartial CollectionHealth = "partial"
+	CollectionFailed  CollectionHealth = "failed"
 )
 
 // Snapshot is the full JSON payload served at /api/status.
 type Snapshot struct {
-	GeneratedAt  time.Time           `json:"generatedAt"`
-	Environments []EnvironmentStatus `json:"environments"`
+	GeneratedAt      time.Time           `json:"generatedAt"`
+	LastSuccessfulAt *time.Time          `json:"lastSuccessfulAt,omitempty"`
+	CollectionHealth CollectionHealth    `json:"collectionHealth"`
+	Environments     []EnvironmentStatus `json:"environments"`
 }
 
 // EnvironmentStatus is one environment's aggregated build statuses, in the
@@ -57,7 +66,6 @@ type ProjectBuildStatus struct {
 	// old/new value, only that "Value of the parameter X changed" — so this
 	// is empty if that exact event isn't found in the recent audit history.
 	BranchChangedBy string `json:"branchChangedBy,omitempty"`
-	// Error is set only when the latest fetch for this build failed for a
-	// reason other than "never run".
+	// Error is set when the latest fetch for this build failed.
 	Error string `json:"error,omitempty"`
 }

@@ -16,7 +16,7 @@ describe("BuildStatusPill", () => {
 
     it("renders the unknown label", () => {
         render(<BuildStatusPill status="unknown" />);
-        expect(screen.getByText("unknown")).toBeInTheDocument();
+        expect(screen.getByText("never run")).toBeInTheDocument();
     });
 
     it("renders the running label", () => {
