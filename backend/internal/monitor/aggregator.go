@@ -23,38 +23,52 @@ const (
 // needs, so tests can fake it without a real HTTP server.
 type teamcityClient interface {
 	LatestBuild(ctx context.Context, buildTypeID string) (teamcity.Build, error)
-	LastParameterChangeAuthor(ctx context.Context, projectID, paramName string) (string, error)
+	LastParameterChangeAuthors(ctx context.Context, projectID string, names []string) (map[string]string, error)
+}
+
+type auditResult struct {
+	authors   map[string]string
+	err       error
+	fetchedAt time.Time
 }
 
 // Aggregator builds a full Snapshot by fanning out over every monitored
 // build in the config. A single build's fetch failure does not affect the
 // rest of the snapshot.
 type Aggregator struct {
-	cfg    *monitorconfig.Config
-	client teamcityClient
-	logger log.Logger
+	cfg           *monitorconfig.Config
+	client        teamcityClient
+	logger        log.Logger
+	auditMu       sync.Mutex
+	auditCache    map[string]auditResult
+	auditInFlight map[string]bool
+	auditSlots    chan struct{}
 }
 
 // NewAggregator builds an Aggregator.
 func NewAggregator(cfg *monitorconfig.Config, client teamcityClient, logger log.Logger) *Aggregator {
-	return &Aggregator{cfg: cfg, client: client, logger: logger}
+	return &Aggregator{cfg: cfg, client: client, logger: logger, auditCache: make(map[string]auditResult), auditInFlight: make(map[string]bool), auditSlots: make(chan struct{}, fetchConcurrency)}
 }
 
-// BuildSnapshot fetches the latest build of every monitored build, and the
-// branch-parameter audit info for every (project, environment) pair,
-// concurrently, and assembles the result into a Snapshot.
+// BuildSnapshot fetches the latest build of every monitored build within a
+// cycle budget, applies cached audit attribution, and starts any due audit
+// refreshes independently of publication.
 func (a *Aggregator) BuildSnapshot(ctx context.Context) *Snapshot {
+	started := time.Now()
 	skeleton, tasks, auditTasks := planTasks(a.cfg)
-
-	forEachConcurrent(tasks, fetchConcurrency, func(task fetchTask) {
-		a.fetchInto(ctx, skeleton, task)
+	for _, task := range tasks {
+		row := &skeleton[task.envIndex].Groups[task.groupIndex].Builds[task.rowIndex]
+		row.Status = BuildUnavailable
+		row.Error = "collection ended before this build could be fetched"
+	}
+	cycleCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	forEachConcurrent(cycleCtx, tasks, fetchConcurrency, func(task fetchTask) {
+		a.fetchInto(cycleCtx, skeleton, task)
 	})
-	// Audit enrichment runs afterward and may be slow. Timestamp the build
-	// results when they were actually collected, before optional enrichment.
 	buildCollectedAt := time.Now().UTC()
-	forEachConcurrent(auditTasks, fetchConcurrency, func(task auditTask) {
-		a.fetchAuditInto(ctx, skeleton, task)
-	})
+	a.applyCachedAudit(skeleton, auditTasks)
+	a.refreshAudit(ctx, auditTasks)
 
 	for i := range skeleton {
 		fillCounts(&skeleton[i])
@@ -77,18 +91,30 @@ func (a *Aggregator) BuildSnapshot(ctx context.Context) *Snapshot {
 	if total > 0 && failed == total {
 		health = CollectionFailed
 	}
-	return &Snapshot{GeneratedAt: buildCollectedAt, CollectionHealth: health, Environments: skeleton}
+	return &Snapshot{GeneratedAt: buildCollectedAt, CollectionHealth: health, PollDurationMs: time.Since(started).Milliseconds(), FailedBuilds: failed, Environments: skeleton}
 }
 
 // forEachConcurrent runs fn over items with at most concurrency in flight,
 // waiting for all to finish.
-func forEachConcurrent[T any](items []T, concurrency int, fn func(T)) {
+func forEachConcurrent[T any](ctx context.Context, items []T, concurrency int, fn func(T)) {
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 
+loop:
 	for _, item := range items {
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			break loop
+		}
+		if ctx.Err() != nil {
+			<-sem
+			break
+		}
 		wg.Add(1)
-		sem <- struct{}{}
 
 		go func(item T) {
 			defer wg.Done()
@@ -99,6 +125,72 @@ func forEachConcurrent[T any](items []T, concurrency int, fn func(T)) {
 	}
 
 	wg.Wait()
+}
+
+// Audit history is optional and cached across cycles. A refresh runs at most
+// once per project every minute, with one page request for all environments.
+func (a *Aggregator) refreshAudit(ctx context.Context, tasks []auditTask) {
+	byProject := make(map[string][]auditTask)
+	for _, task := range tasks {
+		byProject[task.projectID] = append(byProject[task.projectID], task)
+	}
+	for projectID, projectTasks := range byProject {
+		a.auditMu.Lock()
+		cached := a.auditCache[projectID]
+		if a.auditInFlight[projectID] || time.Since(cached.fetchedAt) < time.Minute {
+			a.auditMu.Unlock()
+			continue
+		}
+		a.auditInFlight[projectID] = true
+		a.auditMu.Unlock()
+		go func(projectID string, projectTasks []auditTask) {
+			select {
+			case a.auditSlots <- struct{}{}:
+				defer func() { <-a.auditSlots }()
+			case <-ctx.Done():
+				a.auditMu.Lock()
+				delete(a.auditInFlight, projectID)
+				a.auditMu.Unlock()
+				return
+			}
+			requestCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
+			defer cancel()
+			names := make([]string, len(projectTasks))
+			for i, task := range projectTasks {
+				names[i] = task.paramName
+			}
+			authors, err := a.client.LastParameterChangeAuthors(requestCtx, projectID, names)
+			if err != nil {
+				a.logger.Error(err, "fetch parameter change authors failed for ", projectID)
+			}
+			a.auditMu.Lock()
+			a.auditCache[projectID] = auditResult{authors: authors, err: err, fetchedAt: time.Now()}
+			delete(a.auditInFlight, projectID)
+			a.auditMu.Unlock()
+		}(projectID, projectTasks)
+	}
+}
+
+func (a *Aggregator) applyCachedAudit(skeleton []EnvironmentStatus, tasks []auditTask) {
+	a.auditMu.Lock()
+	defer a.auditMu.Unlock()
+	for _, task := range tasks {
+		cached, ok := a.auditCache[task.projectID]
+		if !ok {
+			continue
+		}
+		for _, ref := range task.targets {
+			row := &skeleton[ref.envIndex].Groups[ref.groupIndex].Builds[ref.rowIndex]
+			if cached.err != nil {
+				row.AttributionStatus = "error"
+			} else if author, found := cached.authors[task.paramName]; found {
+				row.AttributionStatus = "found"
+				row.BranchChangedBy = author
+			} else {
+				row.AttributionStatus = "not_found"
+			}
+		}
+	}
 }
 
 func (a *Aggregator) fetchInto(ctx context.Context, skeleton []EnvironmentStatus, task fetchTask) {
@@ -113,31 +205,14 @@ func (a *Aggregator) fetchInto(ctx context.Context, skeleton []EnvironmentStatus
 	switch {
 	case errors.Is(err, teamcity.ErrNoBuilds):
 		row.Status = BuildUnknown
+		row.Error = ""
 	case err != nil:
 		row.Status = BuildUnavailable
 		row.Error = err.Error()
 		a.logger.Error(err, "fetch latest build failed for ", task.buildTypeID, " (", task.projectName, ")")
 	default:
+		row.Error = ""
 		fillRow(row, build)
-	}
-}
-
-func (a *Aggregator) fetchAuditInto(ctx context.Context, skeleton []EnvironmentStatus, task auditTask) {
-	reqCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
-	defer cancel()
-
-	username, err := a.client.LastParameterChangeAuthor(reqCtx, task.projectID, task.paramName)
-
-	switch {
-	case errors.Is(err, teamcity.ErrNoAuditRecord):
-		return
-	case err != nil:
-		a.logger.Error(err, "fetch last parameter change author failed for ", task.paramName, " (", task.projectID, ")")
-		return
-	}
-
-	for _, ref := range task.targets {
-		skeleton[ref.envIndex].Groups[ref.groupIndex].Builds[ref.rowIndex].BranchChangedBy = username
 	}
 }
 
@@ -145,6 +220,7 @@ func fillRow(row *ProjectBuildStatus, build teamcity.Build) {
 	row.Status = mapStatus(build)
 	row.Branch = build.Branch
 	row.BuildNumber = build.Number
+	row.StatusText = build.StatusText
 	row.TriggeredBy = build.TriggeredBy
 	row.WebURL = build.WebURL
 
@@ -160,7 +236,10 @@ func mapStatus(build teamcity.Build) BuildStatus {
 	if build.Canceled || build.FailedToStart {
 		return BuildError
 	}
-	if build.State == teamcity.StateQueued || build.State == teamcity.StateRunning {
+	if build.State == teamcity.StateQueued {
+		return BuildQueued
+	}
+	if build.State == teamcity.StateRunning {
 		return BuildRunning
 	}
 

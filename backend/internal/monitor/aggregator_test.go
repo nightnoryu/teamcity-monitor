@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/nightnoryu/go-kita/log"
 	"github.com/stretchr/testify/require"
 
+	"teamcity-monitor/internal/monitorconfig"
 	"teamcity-monitor/internal/teamcity"
 )
 
@@ -21,6 +23,7 @@ type fakeFetcher struct {
 	authorErr     error
 	auditWait     <-chan struct{}
 	auditEntered  chan<- struct{}
+	auditCalls    atomic.Int64
 }
 
 func (f *fakeFetcher) LatestBuild(_ context.Context, buildTypeID string) (teamcity.Build, error) {
@@ -47,6 +50,32 @@ func (f *fakeFetcher) LastParameterChangeAuthor(_ context.Context, _, paramName 
 		return author, nil
 	}
 	return "", teamcity.ErrNoAuditRecord
+}
+
+func (f *fakeFetcher) LastParameterChangeAuthors(ctx context.Context, projectID string, names []string) (map[string]string, error) {
+	f.auditCalls.Add(1)
+	authors := make(map[string]string)
+	for _, name := range names {
+		author, err := f.LastParameterChangeAuthor(ctx, projectID, name)
+		if err != nil && !errors.Is(err, teamcity.ErrNoAuditRecord) {
+			return nil, err
+		}
+		if err == nil {
+			authors[name] = author
+		}
+	}
+	return authors, nil
+}
+
+func TestAggregator_AuditFetchedOncePerProjectAcrossEnvironments(t *testing.T) {
+	cfg := sampleConfig()
+	cfg.Projects[0].MonitoredBuilds = append(cfg.Projects[0].MonitoredBuilds, monitorconfig.MonitoredBuild{Environment: "orange", Name: "ru", ID: "Alpha_Orange_Ru"})
+	fetcher := &fakeFetcher{}
+	aggregator := NewAggregator(cfg, fetcher, newTestLogger(t))
+	aggregator.BuildSnapshot(t.Context())
+	require.Eventually(t, func() bool { return fetcher.auditCalls.Load() == 2 }, time.Second, time.Millisecond)
+	aggregator.BuildSnapshot(t.Context())
+	require.Equal(t, int64(2), fetcher.auditCalls.Load())
 }
 
 func TestAggregator_GeneratedAtPrecedesAuditEnrichment(t *testing.T) {
@@ -98,11 +127,40 @@ func TestAggregator_BuildSnapshot_PartialFailureDoesNotBlankSnapshot(t *testing.
 	euGroup := dev.Groups[1]
 	require.Equal(t, BuildUnavailable, euGroup.Builds[0].Status, "Alpha eu fetch failed")
 	require.Equal(t, CollectionPartial, snapshot.CollectionHealth)
+	require.Equal(t, int64(0), snapshot.PollDurationMs/1000)
+	require.Equal(t, 1, snapshot.FailedBuilds)
 	require.NotEmpty(t, euGroup.Builds[0].Error)
 	require.Equal(t, BuildSuccess, euGroup.Builds[1].Status, "Beta eu succeeded despite Alpha eu failing")
 
 	buildGroup := dev.Groups[2]
 	require.Equal(t, BuildFailure, buildGroup.Builds[0].Status)
+}
+
+func TestAggregator_AuditDelayDoesNotHoldBuildSnapshot(t *testing.T) {
+	wait := make(chan struct{})
+	entered := make(chan struct{}, 2)
+	aggregator := NewAggregator(sampleConfig(), &fakeFetcher{auditWait: wait, auditEntered: entered}, newTestLogger(t))
+	start := time.Now()
+	snapshot := aggregator.BuildSnapshot(t.Context())
+	require.Less(t, time.Since(start), time.Second)
+	require.NotNil(t, snapshot)
+	<-entered
+	close(wait)
+}
+
+func TestAggregator_CanceledCycleMarksUnscheduledBuildsUnavailable(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	aggregator := NewAggregator(sampleConfig(), &fakeFetcher{}, newTestLogger(t))
+	snapshot := aggregator.BuildSnapshot(ctx)
+	require.Equal(t, CollectionFailed, snapshot.CollectionHealth)
+	require.Equal(t, 5, snapshot.FailedBuilds)
+	for _, group := range snapshot.Environments[0].Groups {
+		for _, row := range group.Builds {
+			require.Equal(t, BuildUnavailable, row.Status)
+			require.Contains(t, row.Error, "collection ended")
+		}
+	}
 }
 
 func TestAggregator_BuildSnapshot_SuccessFraction(t *testing.T) {
@@ -144,8 +202,27 @@ func TestAggregator_BuildSnapshot_InProgressBuildShowsAsRunning(t *testing.T) {
 
 	dev := snapshot.Environments[0]
 	require.Equal(t, BuildRunning, dev.Groups[0].Builds[0].Status, "running build, even with a provisional SUCCESS status")
-	require.Equal(t, BuildRunning, dev.Groups[1].Builds[0].Status, "queued build")
+	require.Equal(t, BuildQueued, dev.Groups[1].Builds[0].Status, "queued build")
 	require.Zero(t, dev.SuccessCount, "in-progress builds don't count as success")
+}
+
+func TestLatestAttemptReplacesPriorSuccess(t *testing.T) {
+	cfg := sampleConfig()
+	fetcher := &fakeFetcher{byBuildTypeID: map[string]teamcity.Build{}}
+	aggregator := NewAggregator(cfg, fetcher, newTestLogger(t))
+	for _, test := range []struct {
+		build  teamcity.Build
+		status BuildStatus
+	}{
+		{teamcity.Build{State: teamcity.StateFinished, Status: teamcity.StatusSuccess}, BuildSuccess},
+		{teamcity.Build{State: teamcity.StateQueued}, BuildQueued},
+		{teamcity.Build{State: teamcity.StateRunning}, BuildRunning},
+		{teamcity.Build{State: teamcity.StateFinished, Status: teamcity.StatusFailure}, BuildFailure},
+	} {
+		fetcher.byBuildTypeID["Alpha_Testing_Dev_Ru"] = test.build
+		snapshot := aggregator.BuildSnapshot(t.Context())
+		require.Equal(t, test.status, snapshot.Environments[0].Groups[0].Builds[0].Status)
+	}
 }
 
 func TestAggregator_BuildSnapshot_BranchChangedByAppliesToAllRowsInGroup(t *testing.T) {
@@ -164,12 +241,33 @@ func TestAggregator_BuildSnapshot_BranchChangedByAppliesToAllRowsInGroup(t *test
 	logger := newTestLogger(t)
 	aggregator := NewAggregator(sampleConfig(), fetcher, logger)
 
+	aggregator.BuildSnapshot(t.Context())
+	// Attribution is refreshed separately and appears on the next snapshot.
+	require.Eventually(t, func() bool {
+		aggregator.auditMu.Lock()
+		defer aggregator.auditMu.Unlock()
+		return len(aggregator.auditCache) == 2
+	}, time.Second, time.Millisecond)
 	snapshot := aggregator.BuildSnapshot(t.Context())
 
 	dev := snapshot.Environments[0]
 	require.Equal(t, "a.kovalev", dev.Groups[0].Builds[0].BranchChangedBy, "Alpha ru")
 	require.Equal(t, "a.kovalev", dev.Groups[1].Builds[0].BranchChangedBy, "Alpha eu, same project+environment param")
 	require.Empty(t, dev.Groups[2].Builds[0].BranchChangedBy, "Beta build: no matching audit record")
+	require.Equal(t, "not_found", dev.Groups[2].Builds[0].AttributionStatus)
+}
+
+func TestAggregator_AuditPermissionFailureIsVisible(t *testing.T) {
+	aggregator := NewAggregator(sampleConfig(), &fakeFetcher{authorErr: teamcity.ErrUnauthorized}, newTestLogger(t))
+	first := aggregator.BuildSnapshot(t.Context())
+	require.Equal(t, "pending", first.Environments[0].Groups[0].Builds[0].AttributionStatus)
+	require.Eventually(t, func() bool {
+		aggregator.auditMu.Lock()
+		defer aggregator.auditMu.Unlock()
+		return len(aggregator.auditCache) == 2
+	}, time.Second, time.Millisecond)
+	second := aggregator.BuildSnapshot(t.Context())
+	require.Equal(t, "error", second.Environments[0].Groups[0].Builds[0].AttributionStatus)
 }
 
 func TestAggregator_BuildSnapshot_NoBuildsIsUnknownWithoutError(t *testing.T) {

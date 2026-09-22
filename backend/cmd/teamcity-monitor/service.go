@@ -74,7 +74,9 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 	}
 
 	// Shutdown must use a fresh context; ctx is canceled by this point - hence the nolints
+	shutdownDone := make(chan struct{})
 	go func() { //nolint:gosec
+		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -85,6 +87,9 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 
 	logger.Info("Listening and serving...")
 	err = httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		<-shutdownDone
+	}
 	return translateStopErr(err, errServiceStopped)
 }
 

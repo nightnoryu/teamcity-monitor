@@ -96,3 +96,16 @@ func TestPlanTasks_AuditTasksGroupedByProjectAndEnvironment(t *testing.T) {
 	require.Equal(t, "vcs_root_branch_dev", beta.paramName)
 	require.Len(t, beta.targets, 3, "Beta has 3 monitored builds under dev")
 }
+
+func TestPlanTasks_StableIDsWithDuplicateDisplayNames(t *testing.T) {
+	cfg := sampleConfig()
+	cfg.Projects[1].Name = cfg.Projects[0].Name
+	cfg.Projects[0].MonitoredBuilds[1].Name = "ru"
+	skeleton, _, _ := planTasks(cfg)
+	rows := skeleton[0].Groups[0].Builds
+	require.Len(t, rows, 3)
+	require.Equal(t, "Alpha", rows[0].ProjectName)
+	require.Equal(t, "Alpha", rows[2].ProjectName)
+	require.NotEqual(t, rows[0].ProjectID, rows[2].ProjectID)
+	require.NotEqual(t, rows[0].BuildID, rows[1].BuildID)
+}

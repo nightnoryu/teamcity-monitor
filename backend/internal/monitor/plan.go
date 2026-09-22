@@ -71,7 +71,7 @@ func planTasks(cfg *monitorconfig.Config) ([]EnvironmentStatus, []fetchTask, []a
 
 			skeleton[ei].Groups[gi].Builds = append(
 				skeleton[ei].Groups[gi].Builds,
-				ProjectBuildStatus{ProjectName: project.Name},
+				ProjectBuildStatus{ProjectName: project.Name, ProjectID: project.ID, BuildID: build.ID, BuildName: build.Name, AttributionStatus: "pending"},
 			)
 			ri := len(skeleton[ei].Groups[gi].Builds) - 1
 

@@ -17,6 +17,8 @@ type statusResponse struct {
 	GeneratedAt      *time.Time                  `json:"generatedAt,omitempty"`
 	LastSuccessfulAt *time.Time                  `json:"lastSuccessfulAt,omitempty"`
 	CollectionHealth monitor.CollectionHealth    `json:"collectionHealth,omitempty"`
+	PollDurationMs   int64                       `json:"pollDurationMs"`
+	FailedBuilds     int                         `json:"failedBuilds"`
 	Environments     []monitor.EnvironmentStatus `json:"environments,omitempty"`
 }
 
@@ -29,6 +31,8 @@ func statusHandler(poller *monitor.Poller) http.HandlerFunc {
 			resp.GeneratedAt = &snapshot.GeneratedAt
 			resp.LastSuccessfulAt = snapshot.LastSuccessfulAt
 			resp.CollectionHealth = snapshot.CollectionHealth
+			resp.PollDurationMs = snapshot.PollDurationMs
+			resp.FailedBuilds = snapshot.FailedBuilds
 			resp.Environments = snapshot.Environments
 		}
 
