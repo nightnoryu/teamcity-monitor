@@ -3,6 +3,7 @@ package monitorconfig_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,38 @@ func writeConfig(t *testing.T, contents string) string {
 	require.NoError(t, os.WriteFile(path, []byte(contents), 0o600))
 
 	return path
+}
+
+func TestValidate_RegressionCases(t *testing.T) {
+	base := func() *monitorconfig.Config {
+		return &monitorconfig.Config{
+			TeamCityURL: "https://example.com/teamcity/", AccessToken: "token",
+			Environments: []monitorconfig.Environment{{Name: "dev"}},
+			Projects:     []monitorconfig.Project{{Name: "Alpha", ID: "A", EnvironmentBranchParam: "branch_%s", MonitoredBuilds: []monitorconfig.MonitoredBuild{{Environment: "dev", Name: "ru", ID: "A_Ru"}}}},
+		}
+	}
+	tests := map[string]func(*monitorconfig.Config){
+		"duplicate environment": func(c *monitorconfig.Config) {
+			c.Environments = append(c.Environments, monitorconfig.Environment{Name: "dev"})
+		},
+		"blank project name":  func(c *monitorconfig.Config) { c.Projects[0].Name = "  " },
+		"blank build name":    func(c *monitorconfig.Config) { c.Projects[0].MonitoredBuilds[0].Name = "  " },
+		"escaped placeholder": func(c *monitorconfig.Config) { c.Projects[0].EnvironmentBranchParam = "branch_%%s" },
+		"extra formatter":     func(c *monitorconfig.Config) { c.Projects[0].EnvironmentBranchParam = "branch_%s_%d" },
+		"relative URL":        func(c *monitorconfig.Config) { c.TeamCityURL = "/teamcity" },
+		"non HTTP URL":        func(c *monitorconfig.Config) { c.TeamCityURL = "ftp://example.com" },
+		"query URL":           func(c *monitorconfig.Config) { c.TeamCityURL = "https://example.com/?x=1" },
+		"empty query URL":     func(c *monitorconfig.Config) { c.TeamCityURL = "https://example.com/?" },
+		"fragment URL":        func(c *monitorconfig.Config) { c.TeamCityURL = "https://example.com/#fragment" },
+		"empty fragment URL":  func(c *monitorconfig.Config) { c.TeamCityURL = "https://example.com/#" },
+		"missing hostname":    func(c *monitorconfig.Config) { c.TeamCityURL = "https://:8443/" },
+	}
+	for name, change := range tests {
+		t.Run(name, func(t *testing.T) { cfg := base(); change(cfg); require.Error(t, cfg.Validate()) })
+	}
+	for _, raw := range []string{"https://example.com", "https://example.com/teamcity/"} {
+		t.Run("valid "+strings.TrimPrefix(raw, "https://"), func(t *testing.T) { cfg := base(); cfg.TeamCityURL = raw; require.NoError(t, cfg.Validate()) })
+	}
 }
 
 func TestLoad_Valid(t *testing.T) {

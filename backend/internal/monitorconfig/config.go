@@ -78,6 +78,10 @@ func (c *Config) Validate() error {
 	if c.TeamCityURL == "" {
 		return errors.New("teamcity_url must not be empty")
 	}
+	u, err := url.Parse(c.TeamCityURL)
+	if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(c.TeamCityURL, "#") {
+		return errors.New("teamcity_url must be an absolute HTTP(S) URL with a host and no userinfo, query, or fragment")
+	}
 	if _, err := url.ParseRequestURI(c.TeamCityURL); err != nil {
 		return errors.Wrap(err, "invalid teamcity_url")
 	}
@@ -93,8 +97,11 @@ func (c *Config) Validate() error {
 
 	envNames := make(map[string]struct{}, len(c.Environments))
 	for _, env := range c.Environments {
-		if env.Name == "" {
+		if strings.TrimSpace(env.Name) == "" {
 			return errors.New("environment name must not be empty")
+		}
+		if _, exists := envNames[env.Name]; exists {
+			return errors.Errorf("duplicate environment name %q", env.Name)
 		}
 		envNames[env.Name] = struct{}{}
 	}
@@ -116,6 +123,9 @@ func (c *Config) validateProjects(envNames map[string]struct{}) error {
 }
 
 func validateProject(project Project, envNames, projectIDs, buildIDs map[string]struct{}) error {
+	if strings.TrimSpace(project.Name) == "" {
+		return errors.New("project name must not be blank")
+	}
 	if project.ID == "" {
 		return errors.Errorf("project %q: id must not be empty", project.Name)
 	}
@@ -124,8 +134,8 @@ func validateProject(project Project, envNames, projectIDs, buildIDs map[string]
 	}
 	projectIDs[project.ID] = struct{}{}
 
-	if strings.Count(project.EnvironmentBranchParam, "%s") != 1 {
-		return errors.Errorf("project %q: environment_branch_param must contain exactly one %%s placeholder", project.Name)
+	if !validBranchTemplate(project.EnvironmentBranchParam) {
+		return errors.Errorf("project %q: environment_branch_param must contain exactly one literal %%s and no other %%", project.Name)
 	}
 
 	if len(project.MonitoredBuilds) == 0 {
@@ -142,6 +152,9 @@ func validateProject(project Project, envNames, projectIDs, buildIDs map[string]
 }
 
 func validateMonitoredBuild(projectName string, build MonitoredBuild, envNames, buildIDs map[string]struct{}) error {
+	if strings.TrimSpace(build.Name) == "" {
+		return errors.Errorf("project %q: monitored build name must not be blank", projectName)
+	}
 	if build.ID == "" {
 		return errors.Errorf("project %q: monitored build id must not be empty", projectName)
 	}
@@ -158,4 +171,8 @@ func validateMonitoredBuild(projectName string, build MonitoredBuild, envNames, 
 	}
 
 	return nil
+}
+
+func validBranchTemplate(value string) bool {
+	return strings.Count(value, "%s") == 1 && strings.Count(value, "%") == 1
 }

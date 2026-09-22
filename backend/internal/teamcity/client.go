@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -116,14 +118,27 @@ func NewClient(baseURL, token string, httpClient *http.Client) *Client {
 	return &Client{baseURL: baseURL, token: token, http: httpClient}
 }
 
+func (c *Client) endpoint(resource string, query url.Values) string {
+	u, _ := url.Parse(c.baseURL) // configuration validation ensures a valid base URL
+	u.Path = path.Join(u.Path, resource)
+	if strings.HasSuffix(resource, "/") {
+		u.Path += "/"
+	}
+	u.RawQuery = query.Encode()
+	return u.String()
+}
+
 // LatestBuild fetches the most recent build of the given build type,
 // including one still queued or running.
 func (c *Client) LatestBuild(ctx context.Context, buildTypeID string) (Build, error) {
 	// Personal builds are private runs; canceled and failed-to-start builds
 	// are attempts operators need to see across all branches.
-	url := c.baseURL + "/app/rest/buildTypes/id:" + buildTypeID + "/builds/?locator=count:1,state:any,defaultFilter:false,branch:default:any,personal:false,canceled:any,failedToStart:any&fields=" + buildFields
+	endpoint := c.endpoint("app/rest/buildTypes/id:"+buildTypeID+"/builds/", url.Values{
+		"locator": {"count:1,state:any,defaultFilter:false,branch:default:any,personal:false,canceled:any,failedToStart:any"},
+		"fields":  {buildFields},
+	})
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		return Build{}, errors.Wrap(err, "build request")
 	}
@@ -159,39 +174,59 @@ func (c *Client) LatestBuild(ctx context.Context, buildTypeID string) (Build, er
 // "project settings edited" events for the exact comment TeamCity generates
 // for a single-parameter change: "Value of the parameter X changed".
 func (c *Client) LastParameterChangeAuthor(ctx context.Context, projectID, paramName string) (string, error) {
-	url := c.baseURL + "/app/rest/audit?locator=affectedProject:(id:" + projectID +
-		"),action:project_edit_settings,count:" + strconv.Itoa(auditScanLimit) + "&fields=" + auditFields
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	authors, err := c.LastParameterChangeAuthors(ctx, projectID, []string{paramName})
 	if err != nil {
-		return "", errors.Wrap(err, "build request")
+		return "", err
+	}
+	if author, ok := authors[paramName]; ok {
+		return author, nil
+	}
+	return "", ErrNoAuditRecord
+}
+
+// LastParameterChangeAuthors scans one bounded audit page for all requested
+// project parameters. Missing keys have no exact matching event in that page.
+func (c *Client) LastParameterChangeAuthors(ctx context.Context, projectID string, paramNames []string) (map[string]string, error) {
+	endpoint := c.endpoint("app/rest/audit", url.Values{
+		"locator": {"affectedProject:(id:" + projectID + "),action:project_edit_settings,count:" + strconv.Itoa(auditScanLimit)},
+		"fields":  {auditFields},
+	})
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
+	if err != nil {
+		return nil, errors.Wrap(err, "audit request")
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", errors.Wrap(err, "do request")
+		return nil, errors.Wrap(err, "do request")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if err := statusErr(resp.StatusCode); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var payload auditResponse
 	if err := json.NewDecoder(http.MaxBytesReader(nil, resp.Body, maxResponseBytes)).Decode(&payload); err != nil {
-		return "", errors.Wrap(err, "decode response")
+		return nil, errors.Wrap(err, "decode response")
 	}
 
-	wantComment := valueChangedCommentPrefix + paramName + valueChangedCommentSuffix
+	wanted := make(map[string]string, len(paramNames))
+	for _, name := range paramNames {
+		wanted[valueChangedCommentPrefix+name+valueChangedCommentSuffix] = name
+	}
+	authors := make(map[string]string, len(paramNames))
 	for _, event := range payload.AuditEvent {
-		if event.Comment == wantComment {
-			return event.User.displayName(), nil
+		if name, ok := wanted[event.Comment]; ok {
+			if _, found := authors[name]; !found {
+				authors[name] = event.User.displayName()
+			}
 		}
 	}
-
-	return "", ErrNoAuditRecord
+	return authors, nil
 }
 
 type auditResponse struct {

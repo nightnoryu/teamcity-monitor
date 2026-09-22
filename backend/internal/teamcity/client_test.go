@@ -1,6 +1,7 @@
 package teamcity_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,21 @@ import (
 
 	"teamcity-monitor/internal/teamcity"
 )
+
+func TestLastParameterChangeAuthor_ScanBoundary(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Query().Get("locator"), "count:100")
+		events := make([]map[string]any, 100)
+		for i := range events {
+			events[i] = map[string]any{"comment": "other change"}
+		}
+		events[99] = map[string]any{"comment": "Value of the parameter branch_dev changed", "user": map[string]string{"username": "last"}}
+		_ = json.NewEncoder(w).Encode(map[string]any{"auditEvent": events})
+	})
+	author, err := client.LastParameterChangeAuthor(t.Context(), "Project", "branch_dev")
+	require.NoError(t, err)
+	require.Equal(t, "last", author)
+}
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) *teamcity.Client {
 	t.Helper()
@@ -52,6 +68,34 @@ func TestLatestBuild_Success(t *testing.T) {
 
 	wantStart := time.Date(2026, 9, 2, 11, 0, 0, 0, time.FixedZone("", 3*60*60))
 	require.True(t, build.StartedAt.Equal(wantStart))
+}
+
+func TestClient_ContextPathAndTrailingSlash(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/teamcity/app/rest/buildTypes/id:Build/builds/", r.URL.Path)
+		assert.Equal(t, "count:1,state:any,defaultFilter:false,branch:default:any,personal:false,canceled:any,failedToStart:any", r.URL.Query().Get("locator"))
+		_, _ = w.Write([]byte(`{"build":[]}`))
+	}))
+	defer server.Close()
+	for _, suffix := range []string{"/teamcity", "/teamcity/"} {
+		client := teamcity.NewClient(server.URL+suffix, "token", server.Client())
+		_, err := client.LatestBuild(t.Context(), "Build")
+		require.ErrorIs(t, err, teamcity.ErrNoBuilds)
+	}
+}
+
+func TestLastParameterChangeAuthors_OnePageForMultipleParameters(t *testing.T) {
+	requests := 0
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		_, _ = w.Write([]byte(`{"auditEvent":[{"comment":"Value of the parameter branch_dev changed","user":{"username":"new"}},{"comment":"Value of the parameter branch_dev changed","user":{"username":"old"}},{"comment":"Value of the parameter branch_stage changed","user":{"username":"stage"}}]}`))
+	})
+	authors, err := client.LastParameterChangeAuthors(t.Context(), "Project", []string{"branch_dev", "branch_stage", "branch_prod"})
+	require.NoError(t, err)
+	require.Equal(t, 1, requests)
+	require.Equal(t, "new", authors["branch_dev"])
+	require.Equal(t, "stage", authors["branch_stage"])
+	require.NotContains(t, authors, "branch_prod")
 }
 
 func TestLatestBuild_LocatorSelectsNewerBranchFailure(t *testing.T) {
@@ -229,8 +273,8 @@ func TestLatestBuild_ServerError(t *testing.T) {
 
 func TestLastParameterChangeAuthor_Found(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		assert.Contains(t, r.URL.RawQuery, "affectedProject:(id:Alpha_Testing)")
-		assert.Contains(t, r.URL.RawQuery, "action:project_edit_settings")
+		assert.Contains(t, r.URL.Query().Get("locator"), "affectedProject:(id:Alpha_Testing)")
+		assert.Contains(t, r.URL.Query().Get("locator"), "action:project_edit_settings")
 		_, _ = w.Write([]byte(`{
 			"auditEvent": [
 				{"comment": "Subprojects order changed", "user": {"username": "someone"}},
