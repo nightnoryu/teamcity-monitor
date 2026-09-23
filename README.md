@@ -6,10 +6,6 @@
   <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache" alt="CI status"></a>
 </p>
 
-# TeamCity Monitor
-
-*A clear, shared view of your latest deployments.*
-
 **TeamCity Monitor** is a lightweight, self-hosted dashboard that turns the
 latest TeamCity build attempts into an environment-oriented view. See what is
 running, queued, successful, failed, or unavailable across the projects and
