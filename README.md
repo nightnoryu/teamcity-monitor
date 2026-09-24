@@ -1,13 +1,13 @@
-<p align="center"><img src="https://github.com/user-attachments/assets/3448061c-3640-475b-956a-aa75e943d39b" width="800" alt="TeamCity Monitor dashboard"></p>
+<h1 align="center">TeamCity Monitor</h1>
 
 <p align="center">
-  <a href="https://github.com/nightnoryu/teamcity-monitor/releases"><img src="https://img.shields.io/github/release/nightnoryu/teamcity-monitor.svg?cache-control=no-cache" alt="Latest release"></a>
-  <a href="https://github.com/nightnoryu/teamcity-monitor/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nightnoryu/teamcity-monitor?cache-control=no-cache" alt="License"></a>
-  <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache" alt="CI status"></a>
+    <a href="https://github.com/nightnoryu/teamcity-monitor/releases"><img src="https://img.shields.io/github/release/nightnoryu/teamcity-monitor.svg?cache-control=no-cache" alt="Latest release"></a>
+    <a href="https://github.com/nightnoryu/teamcity-monitor/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nightnoryu/teamcity-monitor?cache-control=no-cache" alt="License"></a>
+    <a href="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml"><img src="https://github.com/nightnoryu/teamcity-monitor/actions/workflows/ci.yml/badge.svg?cache-control=no-cache" alt="CI status"></a>
 </p>
 
-**TeamCity Monitor** is a lightweight, self-hosted dashboard that turns the
-latest TeamCity build attempts into an environment-oriented view. See what is
+A lightweight, self-hosted dashboard that turns the latest TeamCity
+build attempts into an environment-oriented view. See what is
 running, queued, successful, failed, or unavailable across the projects and
 regions you care about—without digging through individual build configurations.
 
