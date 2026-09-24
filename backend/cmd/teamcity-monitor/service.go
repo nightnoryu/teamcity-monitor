@@ -27,6 +27,8 @@ const (
 	requestTimeout         = 30 * time.Second
 	headersTimeout         = 10 * time.Second
 	teamcityRequestTimeout = 15 * time.Second
+	immutableAssetCache    = "public, max-age=31536000, immutable"
+	htmlCache              = "no-cache"
 )
 
 var errServiceStopped = stderrors.New("service stopped without errors")
@@ -138,7 +140,14 @@ func spaHandler(assets fs.FS) http.Handler {
 			name = "index.html"
 		}
 
-		if _, statErr := fs.Stat(assets, name); statErr != nil {
+		info, statErr := fs.Stat(assets, name)
+		if statErr == nil && !info.IsDir() && strings.HasPrefix(name, "assets/") {
+			w.Header().Set("Cache-Control", immutableAssetCache)
+		} else {
+			w.Header().Set("Cache-Control", htmlCache)
+		}
+
+		if statErr != nil {
 			r = r.Clone(r.Context())
 			r.URL.Path = "/"
 		}

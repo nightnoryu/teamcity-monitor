@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- cache built web assets for one year and revalidate the dashboard HTML on each load
+
 ## v0.2.0
 
 - dashboard now shows collection health, stale snapshots, failed build fetches,
