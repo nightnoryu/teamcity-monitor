@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.1
 
 - cache built web assets for one year and revalidate the dashboard HTML on each load
 
