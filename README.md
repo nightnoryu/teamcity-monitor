@@ -25,6 +25,16 @@ regions you care about—without digging through individual build configurations
 - Best-effort attribution of the last environment-branch parameter change
 - One static Go binary with an embedded React frontend
 
+## 📸 Screenshots
+
+### Desktop
+
+<img width="1600" alt="TeamCity Monitor dashboard with demo projects and environments" src="https://github.com/user-attachments/assets/eb49c984-5a22-404b-af99-fcd1f8ea2f92" />
+
+### Mobile
+
+<img width="430" alt="TeamCity Monitor mobile dashboard with demo projects and environments" src="https://github.com/user-attachments/assets/2d0afa11-5c73-4f71-8715-538b117ae941" />
+
 ## 🚀 Run your own
 
 Create a `config.toml` from [the example](config.example.toml), set your
