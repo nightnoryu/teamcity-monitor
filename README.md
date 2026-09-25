@@ -64,16 +64,14 @@ health checks, and operational guidance.
 ## ⚒️ Local development
 
 Install [mise](https://mise.jdx.dev) and Docker with the Compose plugin, copy
-`config.example.toml` to `config.toml`, then map the hostname used in
-`compose.yml` (Linux/macOS):
+`config.example.toml` to `config.toml`, and set your TeamCity URL and access
+token. Start the local stack with:
 
 ```shell
-echo '127.0.0.1 teamcity-monitor.lan' | sudo tee -a /etc/hosts
 mise run dev
 ```
 
-Open <http://teamcity-monitor.lan>. For another hostname, change both `Host(...)`
-rules in `compose.yml` and the hosts-file entry.
+Open <http://localhost:3000>. The local Compose stack binds the ingress to `127.0.0.1:3000`.
 
 Vite reloads frontend changes. After Go changes, run `mise run dev:reload`.
 `mise run` performs the full build, test, and lint pass.

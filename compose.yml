@@ -9,7 +9,7 @@ services:
       - "--entrypoints.web.address=:80"
       - "--ping=true"
     ports:
-      - "127.0.0.1:80:80"
+      - "127.0.0.1:3000:80"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     healthcheck:
@@ -37,7 +37,7 @@ services:
       - "./config.toml:/app/config.toml:ro"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tcm-api.rule=Host(`teamcity-monitor.lan`) && (PathPrefix(`/api`) || Path(`/healthz`) || Path(`/livez`))"
+      - "traefik.http.routers.tcm-api.rule=Host(`localhost`) && (PathPrefix(`/api`) || Path(`/healthz`) || Path(`/livez`))"
       - "traefik.http.services.tcm-api.loadbalancer.server.port=8080"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/livez" ]
@@ -54,7 +54,7 @@ services:
       - "/app/node_modules"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tcm-web.rule=Host(`teamcity-monitor.lan`)"
+      - "traefik.http.routers.tcm-web.rule=Host(`localhost`)"
       - "traefik.http.services.tcm-web.loadbalancer.server.port=3000"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:3000/" ]

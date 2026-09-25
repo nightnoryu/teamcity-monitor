@@ -7,7 +7,7 @@ export default defineConfig({
         host: true,
         port: 3000,
         strictPort: true,
-        allowedHosts: ["teamcity-monitor.lan"],
+        allowedHosts: ["localhost"],
         watch: {
             usePolling: true,
             interval: 100,
