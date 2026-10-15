@@ -62,6 +62,8 @@ run = "go mod tidy"
 [tasks."backend:modules"]
 dir = "backend"
 run = "go mod download"
+sources = [ "go.mod", "go.sum", "../mise.toml" ]
+outputs = { auto = true }
 
 [tasks."backend:build"]
 dir = "backend"
