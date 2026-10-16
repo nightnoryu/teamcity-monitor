@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
 
 - expose Prometheus HTTP, polling, and process metrics on a configurable private listener
 - add configurable JSON log levels, structured request and collection summaries, and sanitized TeamCity transport errors
