@@ -10,6 +10,6 @@ WORKDIR /app
 
 USER teamcity-monitor-user
 
-EXPOSE 8080
+EXPOSE 8080 9090
 ENTRYPOINT [ "/app/bin/teamcity-monitor" ]
 CMD ["service"]

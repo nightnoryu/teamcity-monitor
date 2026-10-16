@@ -18,6 +18,7 @@ import (
 
 	"teamcity-monitor/internal/monitor"
 	"teamcity-monitor/internal/monitorconfig"
+	"teamcity-monitor/internal/observability"
 	"teamcity-monitor/internal/teamcity"
 	"teamcity-monitor/internal/webui"
 )
@@ -41,6 +42,15 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 	if err != nil {
 		return errors.Wrap(err, "load monitor config")
 	}
+	metrics := observability.New()
+	if config.MetricsAddress != "" {
+		closeMetrics, metricsErr := startMetrics(ctx, config.MetricsAddress, metrics, logger)
+		if metricsErr != nil {
+			return errors.Wrap(metricsErr, "start metrics")
+		}
+		defer closeMetrics()
+		logger.Info("Metrics server listening on " + config.MetricsAddress)
+	}
 
 	tcClient := teamcity.NewClient(monCfg.TeamCityURL, monCfg.AccessToken, &http.Client{
 		Timeout: teamcityRequestTimeout,
@@ -49,7 +59,14 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 		},
 	})
 	aggregator := monitor.NewAggregator(monCfg, tcClient, logger)
-	poller := monitor.NewPoller(aggregator, config.PollInterval)
+	poller := monitor.NewPoller(aggregator, config.PollInterval, func(snapshot *monitor.Snapshot) {
+		metrics.Poll(snapshot)
+		total := 0
+		for _, env := range snapshot.Environments {
+			total += env.TotalCount
+		}
+		logger.WithFields(log.Fields{routeHealth: snapshot.CollectionHealth, "duration_ms": snapshot.PollDurationMs, "failed_builds": snapshot.FailedBuilds, "total_builds": total}).Info("collection completed")
+	})
 
 	// Long-lived background loop; stops via poller.Run's own ctx.Done() check, not a context deadline.
 	go poller.Run(ctx) //nolint:contextcheck
@@ -71,7 +88,7 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 	router.PathPrefix("/").Handler(spaHandler(assets))
 
 	httpServer := &http.Server{
-		Handler:           router,
+		Handler:           observeHTTP(router, metrics, logger),
 		Addr:              config.ServeRESTAddress,
 		ReadHeaderTimeout: headersTimeout,
 		ReadTimeout:       requestTimeout,
@@ -90,7 +107,7 @@ func service(ctx context.Context, config *config, logger log.Logger) error {
 		}
 	}()
 
-	logger.Info("Listening and serving...")
+	logger.Info("HTTP server listening on " + config.ServeRESTAddress)
 	err = httpServer.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		<-shutdownDone

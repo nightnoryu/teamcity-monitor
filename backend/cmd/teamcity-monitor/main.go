@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/nightnoryu/go-kita/env"
 	"github.com/nightnoryu/go-kita/jsonlog"
 	"github.com/nightnoryu/go-kita/log"
 )
@@ -20,16 +19,15 @@ func main() {
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelFunc()
 
-	logger, err := initLogger()
+	cnf, err := loadConfig()
+	if err != nil {
+		stdlog.Fatal(err)
+	}
+	logger, err := initLogger(cnf.LogLevel)
 	if err != nil {
 		stdlog.Fatal(err)
 	}
 	defer func() { _ = logger.Sync() }()
-
-	cnf, err := env.ParseEnv[config](appID)
-	if err != nil {
-		logger.FatalError(err)
-	}
 
 	err = runApp(ctx, cnf, logger)
 	if errors.Is(err, errServiceStopped) {
@@ -51,9 +49,9 @@ func runApp(ctx context.Context, config *config, logger log.Logger) error {
 	return fmt.Errorf("unknown mode: %s", mode)
 }
 
-func initLogger() (log.MainLogger, error) {
+func initLogger(level jsonlog.Level) (log.MainLogger, error) {
 	return jsonlog.NewLogger(&jsonlog.Config{
-		Level:   jsonlog.InfoLevel,
+		Level:   level,
 		AppName: appID,
 	})
 }

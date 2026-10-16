@@ -12,11 +12,16 @@ type Poller struct {
 	aggregator *Aggregator
 	interval   time.Duration
 	current    atomic.Pointer[Snapshot]
+	observe    func(*Snapshot)
 }
 
 // NewPoller builds a Poller. Call Run to start polling.
-func NewPoller(aggregator *Aggregator, interval time.Duration) *Poller {
-	return &Poller{aggregator: aggregator, interval: interval}
+func NewPoller(aggregator *Aggregator, interval time.Duration, observers ...func(*Snapshot)) *Poller {
+	p := &Poller{aggregator: aggregator, interval: interval}
+	if len(observers) > 0 {
+		p.observe = observers[0]
+	}
+	return p
 }
 
 // Interval is the configured time between collection cycles.
@@ -55,4 +60,7 @@ func (p *Poller) refresh(ctx context.Context) {
 		snapshot.LastSuccessfulAt = previous.LastSuccessfulAt
 	}
 	p.current.Store(snapshot)
+	if p.observe != nil {
+		p.observe(snapshot)
+	}
 }

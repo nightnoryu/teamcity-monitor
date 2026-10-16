@@ -42,3 +42,21 @@ func TestPoller_InitialPeriodicAndCancel(t *testing.T) {
 	require.True(t, ready)
 	require.Equal(t, CollectionHealthy, snapshot.CollectionHealth)
 }
+
+func TestPoller_ObservesPublishedSnapshot(t *testing.T) {
+	seen := make(chan *Snapshot, 1)
+	poller := NewPoller(NewAggregator(sampleConfig(), &countingClient{}, newTestLogger(t)), time.Hour, func(snapshot *Snapshot) {
+		seen <- snapshot
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go poller.Run(ctx)
+	select {
+	case observed := <-seen:
+		published, ready := poller.Snapshot()
+		require.True(t, ready)
+		require.Same(t, published, observed)
+	case <-time.After(time.Second):
+		t.Fatal("poll was not observed")
+	}
+}
