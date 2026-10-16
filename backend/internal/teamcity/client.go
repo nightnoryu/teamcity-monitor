@@ -4,12 +4,15 @@ package teamcity
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-faster/errors"
@@ -140,14 +143,14 @@ func (c *Client) LatestBuild(ctx context.Context, buildTypeID string) (Build, er
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
-		return Build{}, errors.Wrap(err, "build request")
+		return Build{}, errors.New("invalid build request")
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return Build{}, errors.Wrap(err, "do request")
+		return Build{}, errors.Wrap(safeRequestError(err), "do request")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -194,14 +197,14 @@ func (c *Client) LastParameterChangeAuthors(ctx context.Context, projectID strin
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
-		return nil, errors.Wrap(err, "audit request")
+		return nil, errors.New("invalid audit request")
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "do request")
+		return nil, errors.Wrap(safeRequestError(err), "do request")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -227,6 +230,29 @@ func (c *Client) LastParameterChangeAuthors(ctx context.Context, projectID strin
 		}
 	}
 	return authors, nil
+}
+
+// net/http errors can contain the full URL, including query parameters. Keep
+// useful failure categories while ensuring returned errors are safe to log.
+func safeRequestError(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	var certErr x509.UnknownAuthorityError
+	if errors.As(err, &certErr) {
+		return errors.New("TLS certificate authority not trusted")
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return errors.New("connection refused")
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return errors.New("network timeout")
+	}
+	return errors.New("transport failure")
 }
 
 type auditResponse struct {

@@ -161,7 +161,7 @@ func (a *Aggregator) refreshAudit(ctx context.Context, tasks []auditTask) {
 			}
 			authors, err := a.client.LastParameterChangeAuthors(requestCtx, projectID, names)
 			if err != nil {
-				a.logger.Error(err, "fetch parameter change authors failed for ", projectID)
+				a.logger.WithFields(log.Fields{"project_id": projectID}).Error(err, "fetch parameter change authors failed")
 			}
 			a.auditMu.Lock()
 			a.auditCache[projectID] = auditResult{authors: authors, err: err, fetchedAt: time.Now()}
@@ -209,7 +209,7 @@ func (a *Aggregator) fetchInto(ctx context.Context, skeleton []EnvironmentStatus
 	case err != nil:
 		row.Status = BuildUnavailable
 		row.Error = err.Error()
-		a.logger.Error(err, "fetch latest build failed for ", task.buildTypeID, " (", task.projectName, ")")
+		a.logger.WithFields(log.Fields{"build_type_id": task.buildTypeID, "project_id": row.ProjectID}).Error(err, "fetch latest build failed")
 	default:
 		row.Error = ""
 		fillRow(row, build)

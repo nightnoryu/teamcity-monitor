@@ -1,7 +1,9 @@
 package teamcity_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +14,26 @@ import (
 
 	"teamcity-monitor/internal/teamcity"
 )
+
+type failingTransport func(*http.Request) (*http.Response, error)
+
+func (f failingTransport) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func TestTransportErrorsDoNotExposeRequestURLs(t *testing.T) {
+	client := teamcity.NewClient("https://private.example/teamcity", "secret-token", &http.Client{Transport: failingTransport(func(req *http.Request) (*http.Response, error) {
+		return nil, errors.New("failed to reach " + req.URL.String())
+	})})
+	_, buildErr := client.LatestBuild(context.Background(), "Build")
+	_, auditErr := client.LastParameterChangeAuthors(context.Background(), "Project", []string{"branch_dev"})
+	for _, err := range []error{buildErr, auditErr} {
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "transport failure")
+		require.NotContains(t, err.Error(), "private.example")
+		require.NotContains(t, err.Error(), "locator=")
+		require.NotContains(t, err.Error(), "fields=")
+		require.NotContains(t, err.Error(), "secret-token")
+	}
+}
 
 func TestLastParameterChangeAuthor_ScanBoundary(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
