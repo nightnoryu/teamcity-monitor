@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- expose Prometheus HTTP, polling, and process metrics on a configurable private listener
+- add configurable JSON log levels, structured request and collection summaries, and sanitized TeamCity transport errors
+
 ## v0.2.1
 
 - cache built web assets for one year and revalidate the dashboard HTML on each load

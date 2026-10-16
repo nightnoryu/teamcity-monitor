@@ -35,6 +35,7 @@ backend/cmd/teamcity-monitor/  process wiring, HTTP server, health and API handl
 backend/internal/monitorconfig/ config.toml decoding and validation
 backend/internal/teamcity/     TeamCity REST client
 backend/internal/monitor/      collection planning, aggregation, and snapshot cache
+backend/internal/observability/ private Prometheus registry and metric definitions
 backend/internal/webui/        embedded Vite production bundle
 web/src/                       React dashboard, API client, and presentation components
 ```
@@ -87,6 +88,12 @@ shown build.
 | `GET /api/status` | Current snapshot, polling metadata, collection health, and per-build errors. |
 | `GET /livez` | Process liveness; `200` while the HTTP server is running. |
 | `GET /healthz` | Collection readiness; `503` before the first poll or when every build fetch in the newest cycle failed. |
+
+The service also exposes `GET /metrics` on a separate, private listener. The
+poller records metrics once per published snapshot; the HTTP server records
+bounded route and status metrics. Go and process collectors use the same
+process-local registry. This listener is disabled with an explicitly empty
+`TEAMCITY_MONITOR_METRICS_ADDRESS`.
 
 The frontend polls `/api/status` at the configured interval. It distinguishes a
 disconnected browser from a stale or partially failed collection, and continues

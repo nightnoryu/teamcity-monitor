@@ -60,6 +60,8 @@ All runtime variables use the `TEAMCITY_MONITOR_` prefix.
 | Variable | Default | Purpose |
 |---|---|---|
 | `SERVE_REST_ADDRESS` | `:8080` | HTTP listen address. |
+| `METRICS_ADDRESS` | `127.0.0.1:9090` | Private Prometheus listener; set to an empty value to disable. |
+| `LOG_LEVEL` | `info` | JSON log level: `debug`, `info`, `warn`, `error`, or `fatal`. |
 | `CONFIG_PATH` | `/app/config.toml` | Path to the monitor configuration. |
 | `POLL_INTERVAL` | `20s` | Time between collection cycles; must be greater than zero. |
 | `INSECURE_SKIP_TLS_VERIFY` | `false` | Disables TeamCity TLS certificate verification. Use only for a trusted local self-signed setup. |
@@ -91,6 +93,8 @@ services:
     environment:
       TEAMCITY_MONITOR_CONFIG_PATH: /app/config.toml
       TEAMCITY_MONITOR_POLL_INTERVAL: 20s
+      TEAMCITY_MONITOR_METRICS_ADDRESS: ":9090"
+      TEAMCITY_MONITOR_LOG_LEVEL: info
       TEAMCITY_MONITOR_INSECURE_SKIP_TLS_VERIFY: "false"
     volumes:
       - "./config.toml:/app/config.toml:ro"
@@ -113,6 +117,25 @@ the host configuration file is readable by that user inside the container.
 | `/livez` | Liveness: the HTTP process is running. |
 | `/healthz` | Readiness: at least the initial collection completed and the latest cycle was not a total failure. |
 | `/api/status` | Detailed snapshot metadata, collection health, failed-build count, and fetch errors. |
+
+Metrics are served at `/metrics` on a **separate listener**. Its default bind
+address is loopback inside the container. For private-network scraping, set
+`TEAMCITY_MONITOR_METRICS_ADDRESS=:9090` and scrape the container on port 9090;
+do not publish that port or route it through the public ingress. An explicitly
+empty value disables the listener. The endpoint exposes Go and process metrics,
+`teamcity_monitor_http_requests_total` and
+`teamcity_monitor_http_request_duration_seconds` (fixed route labels), plus
+`teamcity_monitor_polls_total`, `teamcity_monitor_poll_duration_seconds`, and
+`teamcity_monitor_last_successful_collection_timestamp_seconds`. The last
+timestamp is zero until a fully healthy poll completes. Poll metrics describe
+published snapshots; `partial` and `failed` collections still count as attempts.
+
+Logs are JSON. Each poll emits a summary with health, duration, failed builds,
+and total builds. Fetch and audit errors include the affected identifiers.
+HTTP request summaries include a fixed route name, status, duration, and bytes;
+routine health checks are omitted. Request summaries omit URLs, query strings,
+cookies, and bodies. TeamCity transport failures are logged as safe error
+categories without request URLs or query strings. Access tokens are never logged.
 
 Use `/livez` for a liveness probe and `/healthz` for readiness or load-balancer
 health checks. A partial TeamCity outage still leaves `/healthz` ready, because
