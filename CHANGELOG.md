@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.1
+
+- security updates
+
 ## v0.3.0
 
 - expose Prometheus HTTP, polling, and process metrics on a configurable private listener
