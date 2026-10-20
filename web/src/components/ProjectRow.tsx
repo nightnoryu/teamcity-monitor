@@ -1,5 +1,6 @@
 import type {ProjectBuildStatus} from "../api/types";
 import {formatDate} from "../utils/format";
+import {BranchName} from "./BranchName";
 import {BuildStatusPill} from "./StatusBadge";
 
 function safeBuildUrl(value?: string): string | undefined {
@@ -26,12 +27,7 @@ export function ProjectRow({build, showBuildName = false, showProjectId = false}
             {build.attributionStatus === "pending" && <span className="branch-editor" title="Branch parameter attribution has not been collected yet">Checking editor…</span>}
             {build.attributionStatus === "error" && <span className="branch-editor" title="Branch parameter audit lookup failed">Editor unavailable</span>}
             <div className="project-details">
-                {build.branch && (
-                    <span className="branch-name">
-                        <span className="branch-icon">⎇</span>
-                        {build.branch}
-                    </span>
-                )}
+                {build.branch && <BranchName key={build.branch} branch={build.branch} />}
                 {build.finishedAt && <span className="deploy-date">🕐 {formatDate(build.finishedAt)}</span>}
                 {build.startedAt && <span title="Build started">Started {formatDate(build.startedAt)}</span>}
                 {build.triggeredBy && <span title="Build trigger">Triggered by {build.triggeredBy}</span>}

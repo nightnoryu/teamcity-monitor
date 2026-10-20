@@ -352,6 +352,52 @@ button:focus-visible {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+.branch-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.branch-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.branch-copy:hover {
+    background: var(--surface-raised);
+    color: var(--text-heading);
+}
+
+.branch-copy:disabled {
+    cursor: wait;
+}
+
+.branch-copy-feedback {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--success);
+}
+
+.branch-copy-feedback:empty {
+    display: none;
+}
+
+.branch-copy-feedback.error {
+    color: var(--danger);
 }
 
 .project-details .branch-icon {
