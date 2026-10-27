@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.0
+
+- add copy branch button
+- security fixes
+
 ## v0.3.1
 
 - security updates
